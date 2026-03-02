@@ -1,159 +1,239 @@
 # skillproof
 
-Test-driven skill development for Claude Code. Create, test, and optimize skills through a rigorous 6-phase TDD process.
+A Claude Code plugin for building skills that actually work. Test-driven, with real evidence.
 
-**Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill teaches the right thing.
+You tell Claude what skill you want. It runs agents without the skill, watches them fail, writes the skill to fix those failures, then proves the skill works by running agents again. No guessing.
 
-## Installation
+## Install
 
 ```bash
-# From plugin directory (development)
+# Clone and point Claude at it
+git clone https://github.com/thomaspatane/skillproof.git
 claude --plugin-dir /path/to/skillproof
-
-# Or install directly
-claude plugin install skillproof
 ```
 
-## Quick Start
-
-Invoke the orchestrator skill:
+Once loaded, you get five slash commands:
 
 ```
-/skillproof:writing-skills
+/skillproof:writing-skills              # The main one. Start here.
+/skillproof:skill-tdd                   # TDD methodology (RED-GREEN-REFACTOR)
+/skillproof:skill-testing-discipline    # Pressure testing for rule-enforcement skills
+/skillproof:skill-testing-output        # A/B output quality comparison
+/skillproof:skill-compare               # Head-to-head skill comparison
 ```
 
-This guides you through the full 6-phase flow. The three companion skills are loaded automatically when needed.
+## How it works
 
-## Skill Constellation
+### You say what you want. Claude does the rest.
 
-Four skills that compose into a complete skill development workflow:
+Tell Claude you want to create a skill:
 
 ```
-                    ┌──────────────────┐
-                    │  writing-skills  │  Orchestrator
-                    │  (6-phase flow)  │  Routes by type
-                    └──────┬───────────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-     ┌────────────┐ ┌───────────┐ ┌────────────────┐
-     │  skill-tdd │ │  skill-   │ │  skill-testing- │
-     │  RED-GREEN │ │  testing- │ │  output         │
-     │  REFACTOR  │ │discipline │ │  A/B compare    │
-     └────────────┘ └───────────┘ └────────────────┘
-       Methodology    Pressure      Output quality
-                      testing       comparison
+I want to create a skill that teaches agents to always verify their work
+before claiming it's done.
 ```
 
-Each skill is independently useful:
+Claude loads `writing-skills` and walks through 6 phases automatically:
 
-| Skill | Purpose | Use when |
-|-------|---------|----------|
-| `skillproof:writing-skills` | Full 6-phase orchestrator | Creating, editing, or verifying any skill |
-| `skillproof:skill-tdd` | TDD methodology (RED-GREEN-REFACTOR) | Need the test-first cycle for skill authorship |
-| `skillproof:skill-testing-discipline` | Pressure testing for rule-enforcement skills | Testing skills that enforce rules agents might bypass |
-| `skillproof:skill-testing-output` | Output quality comparison | Evaluating if a skill measurably improves outputs |
+**Phase 1 — Capture Intent.** Claude asks you clarifying questions. What should the skill do? When should it trigger? What type is it? (Discipline skills enforce rules. Workflow skills teach techniques. Reference skills document APIs.)
 
-## 6-Phase Process
+**Phase 2 — Baseline (RED).** Claude spawns a subagent, gives it a task *without* the skill, and watches it fail. This is the critical part. You see exactly what agents do wrong before the skill exists. No hypothesizing — actual observed failures.
 
-| Phase | Name | What happens |
-|-------|------|-------------|
-| 1 | **Capture Intent** | Classify skill type, define triggers, identify success criteria |
-| 2 | **Baseline (RED)** | Run scenarios WITHOUT skill, document failures verbatim |
-| 3 | **Draft (GREEN)** | Write minimal skill addressing specific baseline failures |
-| 4 | **Evaluate** | Run WITH skill, grade assertions, review results |
-| 5 | **Refine (REFACTOR)** | Close loopholes, improve quality, re-test until stable |
-| 6 | **Optimize & Deploy** | Optimize description (20 eval queries), validate, deploy |
+**Phase 3 — Draft (GREEN).** Claude writes a minimal skill that addresses the specific failures it documented. Not a wish list — just enough to fix what it saw break.
 
-## Type Routing
+**Phase 4 — Evaluate.** Claude runs the same scenarios *with* the skill loaded. It grades the results with assertions. Opens a browser-based viewer so you can compare outputs side by side and leave feedback.
 
-Different skill types get different testing strategies:
+**Phase 5 — Refine (REFACTOR).** Based on your feedback, Claude tightens the skill. For discipline skills, this means capturing new rationalizations agents use to wiggle out of rules and adding explicit counters. For workflow skills, it means improving output quality. Repeat phases 4-5 until you're happy.
 
-| Phase | Discipline | Workflow | Reference | Hybrid |
-|-------|-----------|----------|-----------|--------|
-| Baseline | Pressure scenarios (3+ pressures) | Output comparison | Retrieval scenarios | Both |
-| Draft | Rules, negations, rationalization table | Explain why, lean prompts | Scannable, tables | Both |
-| Evaluate | Compliance under pressure | Output quality delta | Correct retrieval | Both |
-| Refine | Close loopholes | Generalize, lean, bundle | Fill gaps | Both |
+**Phase 6 — Optimize & Deploy.** Claude generates 20 test queries to evaluate whether the skill's description triggers correctly (fires when it should, stays quiet when it shouldn't). Runs an optimization loop, picks the best description by test score, validates the structure, and it's ready to ship.
 
-## Bundled Tools
+### What triggers automatically
 
-Each skill includes scripts and tooling. Run from the respective skill directory.
+When Claude loads `writing-skills`, it pulls in the companion skills as needed:
 
-### writing-skills (orchestrator)
+- **Discipline skill detected** → loads `skill-testing-discipline` for pressure testing
+- **Workflow/technique skill detected** → loads `skill-testing-output` for A/B comparison
+- **Comparing two skills** → loads `skill-compare` for head-to-head matchup
+- **Any skill creation** → loads `skill-tdd` for the RED-GREEN-REFACTOR cycle
 
-**Scripts** (run from `skills/writing-skills/`):
-- `python -m scripts.run_loop` — Description optimization loop
-- `python -m scripts.run_eval` — Trigger accuracy evaluation
-- `python -m scripts.aggregate_benchmark` — Benchmark aggregation
-- `python -m scripts.quick_validate` — Structure validation
-- `python -m scripts.package_skill` — Package skill as .skill file
+You don't need to invoke these manually. They compose.
 
-**Agents** (loaded as subagents):
-- `agents/grader.md` — Assertion grading
-- `agents/comparator.md` — Blind A/B comparison
-- `agents/analyzer.md` — Post-comparison analysis
+## The five skills
 
-**Eval Viewer** (browser-based):
-- `eval-viewer/generate_review.py` — Interactive review with feedback collection
+### `writing-skills` — Orchestrator
 
-### skill-tdd
+The main entry point. Guides the full 6-phase flow and routes to the right testing strategy based on skill type.
 
-**Scripts** (run from `skills/skill-tdd/`):
-- `python -m scripts.scaffold_skill <name> -o <path>` — Create new skill directory with SKILL.md template
-- `python -m scripts.scaffold_skill <name> -t discipline` — Scaffold with discipline-specific sections
-- `python -m scripts.run_cycle --skill-path <path> --scenario <file>` — Run RED-GREEN comparison cycle
+Comes with:
+- **Scripts** — description optimization loop, trigger evaluation, benchmark aggregation, structure validation, skill packaging
+- **Agents** — grader (assertion evaluation), comparator (blind A/B), analyzer (post-comparison)
+- **Eval viewer** — browser-based review UI with side-by-side output comparison and feedback collection
+- **References** — authoring best practices, description optimization guide, JSON schemas
 
-### skill-testing-discipline
+### `skill-tdd` — TDD methodology
 
-**Scripts** (run from `skills/skill-testing-discipline/`):
-- `python -m scripts.run_pressure_test --skill-path <path> --scenario <file>` — Run pressure scenarios with/without skill
-- `python -m scripts.run_pressure_test --scenario-dir ./scenarios/ --runs 3` — Batch run with statistical repetition
-- `python -m scripts.extract_choice <response.txt>` — Extract A/B/C choice and rationalizations from output
-- `python -m scripts.extract_choice --workspace <path>` — Batch-extract from all responses in workspace
+The testing discipline itself. Maps TDD concepts to skill development:
 
-**References:**
-- `references/scenario_templates.md` — Ready-to-use pressure scenario templates with 3+ combined pressures
+| TDD | Skill creation |
+|-----|----------------|
+| Write failing test | Run scenario WITHOUT skill, watch agent fail |
+| Write minimal code | Write skill addressing those specific failures |
+| Watch it pass | Run scenario WITH skill, verify improvement |
+| Refactor | Close loopholes, tighten wording, re-test |
 
-### skill-testing-output
+Iron law: **no skill without a failing test first.** Write skill before testing? Delete it. Start over.
 
-**Scripts** (run from `skills/skill-testing-output/`):
-- `python -m scripts.init_workspace <name> --evals <evals.json>` — Create workspace directory structure
-- `python -m scripts.run_comparison --skill-path <path> --evals <evals.json> --workspace <path>` — Run A/B comparisons
-- `python -m scripts.diff_outputs <workspace>/iteration-N/eval-name` — Compare output files between configs
+Comes with:
+- `scaffold_skill` — create a new skill directory with the right template for the skill type
+- `run_cycle` — run a RED-GREEN cycle: execute a scenario without the skill, then with it, save both for comparison
+
+### `skill-testing-discipline` — Pressure testing
+
+For skills that enforce rules agents have incentive to bypass. Tests whether agents comply under realistic pressure — not just whether they can recite the rules.
+
+Combines 3+ pressures (time, sunk cost, authority, exhaustion, pragmatic appeal) and forces explicit A/B/C choices. Captures exact rationalizations verbatim so you know which loopholes to close.
+
+Comes with:
+- `run_pressure_test` — run pressure scenarios with/without a skill, track compliance rates across multiple runs
+- `extract_choice` — parse agent responses for A/B/C choices and rationalizations (single files or entire workspaces)
+- `references/scenario_templates.md` — 5 ready-to-use pressure templates with 3+ combined pressures each
+
+### `skill-testing-output` — A/B output comparison
+
+For skills where output quality matters more than rule compliance. Runs the same prompts with and without the skill, grades the difference with assertions, benchmarks the delta.
+
+Comes with:
+- `init_workspace` — create the workspace directory structure from an evals file
+- `run_comparison` — run parallel A/B comparisons via `claude -p` (with-skill vs without-skill, or old version vs new version)
+- `diff_outputs` — compare output files between configurations with similarity scoring and unified diffs
+
+### `skill-compare` — Head-to-head comparison
+
+For choosing between two skills — different versions, competing approaches, or validating a rewrite. Runs both skills against the same evals, grades independently, then runs blind A/B comparison with randomized label assignment to prevent position bias.
+
+Comes with:
+- `init_matchup` — create a matchup workspace from two skill paths and an evals file
+- `run_matchup` — run both skills against all evals in parallel via `claude -p`
+- `summarize_matchup` — produce a matchup report with winner, quantitative comparison, and blind tally
+
+Uses grading, benchmarking, and viewing infrastructure from `writing-skills`.
+
+## Running scripts manually
+
+Scripts use Python relative imports. Always `cd` into the skill directory first:
+
+```bash
+# Scaffold a new skill
+cd /path/to/skillproof/skills/skill-tdd
+python -m scripts.scaffold_skill my-new-skill -o ~/my-skills -t discipline
+
+# Run a RED-GREEN cycle
+python -m scripts.run_cycle \
+  --skill-path ~/my-skills/my-new-skill \
+  --scenario scenario.txt
+
+# Run pressure tests
+cd /path/to/skillproof/skills/skill-testing-discipline
+python -m scripts.run_pressure_test \
+  --skill-path ~/my-skills/my-new-skill \
+  --scenario scenario.txt \
+  --correct-choice A \
+  --runs 3
+
+# Extract choices from responses
+python -m scripts.extract_choice --workspace ./pressure-workspace/20260302T120000
+
+# Initialize A/B comparison workspace
+cd /path/to/skillproof/skills/skill-testing-output
+python -m scripts.init_workspace my-skill --evals evals.json -o ./workspace
+
+# Run A/B comparisons
+python -m scripts.run_comparison \
+  --skill-path ~/my-skills/my-new-skill \
+  --evals evals.json \
+  --workspace ./workspace/iteration-1
+
+# Diff the outputs
+python -m scripts.diff_outputs ./workspace/iteration-1/eval-my-test
+
+# Initialize matchup workspace (two-skill comparison)
+cd /path/to/skillproof/skills/skill-compare
+python -m scripts.init_matchup \
+  --skill-a ~/my-skills/my-skill-v1 \
+  --skill-b ~/my-skills/my-skill-v2 \
+  --evals evals.json \
+  --output ./matchup-workspace --runs 3
+
+# Run both skills against all evals
+python -m scripts.run_matchup \
+  --workspace ./matchup-workspace/iteration-1
+
+# Summarize matchup results
+python -m scripts.summarize_matchup \
+  --workspace ./matchup-workspace/iteration-1
+
+# Validate skill structure
+cd /path/to/skillproof/skills/writing-skills
+python -m scripts.quick_validate ~/my-skills/my-new-skill
+
+# Optimize description (requires anthropic SDK)
+python -m scripts.run_loop \
+  --eval-set eval.json \
+  --skill-path ~/my-skills/my-new-skill \
+  --model claude-sonnet-4-20250514 \
+  --verbose
+
+# Aggregate benchmark results
+python -m scripts.aggregate_benchmark ./workspace/iteration-1 --skill-name my-skill
+```
 
 ## Prerequisites
 
-- **Claude Code CLI** (`claude`) — Required for trigger evaluation (`run_eval.py`)
-- **anthropic** Python package — Required for description optimization (`run_loop.py`, `improve_description.py`)
+- **Claude Code CLI** (`claude`) — all testing scripts use `claude -p` under the hood
+- **Python 3.10+** — for running scripts
+- **anthropic** Python package — only needed for description optimization (Phase 6)
 
 ```bash
-pip install anthropic
+pip install anthropic  # optional, only for Phase 6
 ```
 
-## Running Scripts
+## Skill types at a glance
 
-Scripts use relative imports, so run them as modules from each skill's directory:
+| Type | What it is | How it's tested | Example |
+|------|-----------|-----------------|---------|
+| **Discipline** | Rules agents must follow | Pressure scenarios (3+ pressures, forced A/B/C choices) | TDD enforcement, verification-before-completion |
+| **Workflow** | How to do things well | A/B output comparison (with vs without skill) | Debugging approach, code review process |
+| **Reference** | Information to look up | Retrieval scenarios (can the agent find and apply it?) | API docs, command reference |
+| **Hybrid** | Rules + techniques | Both pressure testing and output comparison | Coding standards with examples |
 
-```bash
-# writing-skills scripts
-cd /path/to/skillproof/skills/writing-skills
-python -m scripts.run_loop --eval-set eval.json --skill-path . --model claude-sonnet-4-20250514 --verbose
-python -m scripts.quick_validate /path/to/any/skill
+## Project structure
 
-# skill-tdd scripts
-cd /path/to/skillproof/skills/skill-tdd
-python -m scripts.scaffold_skill my-new-skill -o ~/skills -t workflow
-python -m scripts.run_cycle --skill-path ~/skills/my-skill --scenario test.txt
-
-# skill-testing-discipline scripts
-cd /path/to/skillproof/skills/skill-testing-discipline
-python -m scripts.run_pressure_test --skill-path ~/skills/my-skill --scenario scenario.txt --correct-choice A
-
-# skill-testing-output scripts
-cd /path/to/skillproof/skills/skill-testing-output
-python -m scripts.init_workspace my-skill --evals evals.json -o ./workspace
-python -m scripts.run_comparison --skill-path ~/skills/my-skill --evals evals.json --workspace ./workspace/iteration-1
+```
+skillproof/
+├── .claude-plugin/plugin.json
+├── skills/
+│   ├── writing-skills/          # Orchestrator — 6-phase flow
+│   │   ├── SKILL.md
+│   │   ├── scripts/             # run_loop, run_eval, aggregate_benchmark, quick_validate, ...
+│   │   ├── agents/              # grader, comparator, analyzer
+│   │   ├── references/          # best-practices, cso-guide, schemas
+│   │   ├── eval-viewer/         # browser-based review UI
+│   │   └── assets/
+│   ├── skill-tdd/               # TDD methodology
+│   │   ├── SKILL.md
+│   │   └── scripts/             # scaffold_skill, run_cycle
+│   ├── skill-testing-discipline/ # Pressure testing
+│   │   ├── SKILL.md
+│   │   ├── scripts/             # run_pressure_test, extract_choice
+│   │   └── references/          # scenario_templates
+│   ├── skill-testing-output/    # A/B comparison
+│   │   ├── SKILL.md
+│   │   └── scripts/             # init_workspace, run_comparison, diff_outputs
+│   └── skill-compare/           # Head-to-head comparison
+│       ├── SKILL.md
+│       └── scripts/             # init_matchup, run_matchup, summarize_matchup
+├── README.md
+└── LICENSE
 ```
 
 ## License
