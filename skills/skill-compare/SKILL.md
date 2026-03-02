@@ -3,6 +3,7 @@ name: skill-compare
 description: Use when comparing two skills head-to-head on the same tasks to determine
   which produces better results — for choosing between skill versions, competing
   approaches, or validating that a rewrite improves on the original
+allowed-tools: Read, Glob, Grep
 ---
 
 # Comparing Skills Head-to-Head
@@ -233,7 +234,7 @@ python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name
 python eval-viewer/generate_review.py <workspace>/iteration-N --skill-name <name>
 ```
 
-**Prerequisites:** `claude` CLI required for `run_matchup`.
+**Prerequisites:** Python 3.10+, `claude` CLI. Activate `.venv` if available.
 
 ## Checklist
 

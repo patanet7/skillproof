@@ -46,6 +46,7 @@ def run_claude(
         dict with keys: response, duration_seconds, exit_code
     """
     cmd = ["claude", "-p", prompt, "--output-format", "json"]
+    cmd.extend(["--allowedTools", "Read", "Glob", "Grep"])
     if model:
         cmd.extend(["--model", model])
     if skill_path:

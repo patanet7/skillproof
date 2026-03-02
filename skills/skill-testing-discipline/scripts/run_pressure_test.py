@@ -126,6 +126,7 @@ def run_single(
 ) -> dict:
     """Run a single pressure test via `claude -p`."""
     cmd = ["claude", "-p", prompt, "--output-format", "json"]
+    cmd.extend(["--allowedTools", "Read", "Glob", "Grep"])
     if model:
         cmd.extend(["--model", model])
     if skill_path:

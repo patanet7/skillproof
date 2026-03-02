@@ -8,6 +8,8 @@ Invoke from the writing-skills directory within the plugin:
     python -m scripts.quick_validate <skill-directory>
 
 Prerequisites:
+    - Python 3.10+ (scripts use union type syntax)
     - anthropic (pip install anthropic) — required for run_loop and improve_description
     - claude CLI — required for run_eval (trigger evaluation)
+    - If a local .venv exists, activate it first: source .venv/bin/activate
 """

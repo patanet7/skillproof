@@ -1,6 +1,7 @@
 ---
 name: writing-skills
 description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
+allowed-tools: Read, Glob, Grep
 ---
 
 # Writing Skills
@@ -41,17 +42,21 @@ Read `references/best-practices.md` for authoring guidance before drafting.
 
 ## Phase 2: Baseline Testing (RED)
 
-Run test scenarios WITHOUT the skill. Watch the agent fail. Document failures verbatim.
+Document what agents do WITHOUT the skill. Choose the testing tier from `skillproof:skill-tdd` that matches your situation:
 
-**REQUIRED:** Follow `skillproof:skill-tdd` for the TDD methodology.
+- **Spot Check** — failure mode is known from production evidence. Document it directly.
+- **Quick Test** — one scenario, one agent (haiku), cheap validation.
+- **Full Test** — multiple scenarios, multiple agents, full grading pipeline.
 
-**You must ACTUALLY RUN tests, not hypothesize failures.**
-Listing "common failure modes" from general knowledge is NOT baseline testing. You must spawn a subagent, give it the task without the skill, and observe what it actually does. The whole point is to discover failures you didn't predict.
+**REQUIRED:** Follow `skillproof:skill-tdd` for the TDD methodology and tier selection.
+
+**Hypothesized failures don't count as evidence.** Spot checks require direct evidence (production reports, user feedback, prior test results). Quick and full tests require running an actual agent and observing what it does.
 
 | Acceptable | Not acceptable |
 |-----------|---------------|
 | Spawned subagent, observed it chose B | "Agents typically choose B in this situation" |
 | Agent produced output with 3 specific gaps | "Common gaps include X, Y, Z" |
+| Production report: "skill triggers for one-line fixes" | "The skill probably triggers too broadly" |
 | Captured verbatim rationalization from run | Listed known rationalizations from memory |
 
 **Route by type:**

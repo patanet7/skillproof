@@ -1,6 +1,7 @@
 ---
 name: skill-tdd
 description: Use when creating, editing, or validating a SKILL.md before deployment using a test-first cycle — covers new skill authorship, updates to existing skills, and pre-deployment validation of any skill artifact
+allowed-tools: Read, Glob, Grep
 ---
 
 # Test-Driven Skill Development
@@ -87,13 +88,37 @@ Examples: API documentation, command references, library guides.
 ### Hybrid Skills (rules + techniques)
 Combine pressure testing for the discipline aspects and output comparison for the technique aspects.
 
+## Testing Tiers
+
+Not every change needs the full test suite. Choose the tier that fits:
+
+| Tier | When to use | What you do | Token cost |
+|------|-------------|-------------|------------|
+| **Spot Check** | Failure mode is known from production feedback, prior testing, or obviously visible from reading the skill | Document the specific gap. No agents spawned. | None |
+| **Quick Test** | You have a hypothesis but want cheap validation | One scenario, one agent (haiku model). Confirm the gap. | Low |
+| **Full Test** | New skill, major revision, or you can't predict what will fail | Multiple scenarios, multiple agents, full grading pipeline. | High |
+
+**How to choose:**
+- Can you write down the exact failure mode right now, from direct evidence (production reports, user feedback, reading the skill yourself)? → **Spot Check**
+- You suspect the failure but haven't confirmed it? → **Quick Test**
+- You don't know what will fail? → **Full Test**
+
+**Spot check requires specificity.** "It obviously needs work" is NOT a documented failure. "The skill doesn't offer lightweight testing options, so agents always run full eval suites even for trivial checks" IS — that's specific, evidenced, and actionable.
+
+The Iron Law still applies at all tiers: document what fails BEFORE writing/editing. The tiers control HOW you gather evidence, not WHETHER.
+
 ## RED Phase: Baseline Testing
 
-**Goal:** Run test WITHOUT the skill. Watch agent fail. Document exact failures.
+**Goal:** Document what agents do WITHOUT the skill. The method depends on your testing tier.
 
-This is identical to TDD's "write failing test first." You MUST see what agents naturally do before writing the skill.
+**Spot Check RED:** Write down the specific failure mode from your direct evidence. Include source (production report, user feedback, reading the skill). No agents needed.
 
-**Process:**
+**Quick Test RED:** Run ONE scenario with ONE agent (haiku model) WITHOUT the skill. Confirm the hypothesis. Document the result.
+
+**Full Test RED:** Run multiple scenarios. Spawn subagents. Document everything verbatim. This is the full process described below.
+
+### Full Test Process
+
 1. Create pressure scenarios (discipline) or define output tasks (technique)
 2. **Actually run** scenarios WITHOUT the skill loaded — spawn a subagent and observe
 3. Document agent choices and rationalizations word-for-word
@@ -219,7 +244,7 @@ cd <plugin-root>/skills/skill-tdd
 | `python -m scripts.scaffold_skill <name> -t discipline` | Scaffold with discipline-specific sections | Creating a discipline skill |
 | `python -m scripts.run_cycle --skill-path <path> --scenario <file>` | Run RED-GREEN cycle (baseline vs with-skill) | Testing a skill's effect |
 
-**Prerequisites:** `claude` CLI required for `run_cycle`.
+**Prerequisites:** Python 3.10+, `claude` CLI. Activate `.venv` if available.
 
 ## Testing Checklist
 

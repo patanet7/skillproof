@@ -1,6 +1,7 @@
 ---
 name: skill-testing-output
 description: Use when evaluating whether a skill measurably improves outputs by running controlled comparisons — with-skill vs without-skill, old version vs new version, or A/B tests across skill variants — where quality is graded on produced artifacts like code, docs, migrations, or commit messages
+allowed-tools: Read, Glob, Grep
 ---
 
 # Testing Output-Quality Skills
@@ -20,6 +21,16 @@ Test skills by comparing output quality with and without the skill. Run the same
 
 **Do NOT use for:**
 - Discipline skills where compliance matters more than output quality (use `skillproof:skill-testing-discipline`)
+
+## Quick Mode
+
+For quick tests (see `skillproof:skill-tdd` testing tiers), reduce scope:
+- **1 eval prompt** instead of 2-3
+- **Haiku model** for both runs (cheaper, faster)
+- **Skip grading/benchmarking** — review outputs manually
+- **Skip the viewer** — compare response.txt files directly
+
+Quick mode is for cheap validation of a hypothesis, not rigorous comparison. Use the full process below when you need quantitative evidence.
 
 ## Test Case Design
 
@@ -256,7 +267,7 @@ cd <plugin-root>/skills/writing-skills
 python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>
 ```
 
-**Prerequisites:** `claude` CLI required for `run_comparison`.
+**Prerequisites:** Python 3.10+, `claude` CLI. Activate `.venv` if available.
 
 ## Testing Checklist
 

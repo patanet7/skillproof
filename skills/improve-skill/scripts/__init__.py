@@ -23,7 +23,7 @@ Invoke from the improve-skill directory within the plugin:
     python -m scripts.audit_skill /path/to/skill
 
 Prerequisites:
-    - Python 3.10+ (no external dependencies)
+    - Python 3.10+ (scripts use union type syntax; no external dependencies)
     - skill-testing-output scripts for running baseline/validation tests
     - writing-skills grader agent for grading results
 """

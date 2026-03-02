@@ -1,6 +1,7 @@
 ---
 name: skill-testing-discipline
 description: Use when testing skills that enforce rules, require compliance, or have discipline requirements that agents might rationalize away under pressure
+allowed-tools: Read, Glob, Grep
 ---
 
 # Testing Discipline Skills
@@ -23,6 +24,16 @@ Discipline skills enforce rules that agents have incentive to bypass. Testing th
 - Pure reference skills (API docs, syntax guides)
 - Skills without rules to violate
 - Skills agents have no incentive to bypass
+
+## Quick Check
+
+For quick tests (see `skillproof:skill-tdd` testing tiers), reduce scope:
+- **1 scenario** with 2-3 pressures instead of multiple scenarios
+- **Haiku model** (cheaper, faster)
+- **Skip meta-testing** — just confirm the agent makes the right/wrong choice
+- Compare the single response against your hypothesis
+
+Quick checks validate a known failure mode cheaply. Use the full process below for new skills or major revisions.
 
 ## Writing Pressure Scenarios
 
@@ -282,7 +293,7 @@ cd <plugin-root>/skills/skill-testing-discipline
 | `python -m scripts.extract_choice --workspace <path>` | Batch-extract from all responses | Analyzing full workspace |
 | `references/scenario_templates.md` | Ready-to-use pressure scenario templates (3+ pressures) | Writing new scenarios |
 
-**Prerequisites:** `claude` CLI required for `run_pressure_test`.
+**Prerequisites:** Python 3.10+, `claude` CLI. Activate `.venv` if available.
 
 ## Testing Checklist
 

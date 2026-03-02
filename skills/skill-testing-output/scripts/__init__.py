@@ -7,5 +7,7 @@ Invoke from the skill-testing-output directory within the plugin:
     python -m scripts.diff_outputs <workspace>/iteration-N/eval-name
 
 Prerequisites:
+    - Python 3.10+ (scripts use union type syntax)
     - claude CLI — required for run_comparison (runs claude -p subprocesses)
+    - If a local .venv exists, activate it first: source .venv/bin/activate
 """

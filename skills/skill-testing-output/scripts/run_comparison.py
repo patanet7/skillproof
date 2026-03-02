@@ -44,6 +44,7 @@ def run_single_eval(
         dict with duration_seconds, exit_code, response_length
     """
     cmd = ["claude", "-p", prompt, "--output-format", "json"]
+    cmd.extend(["--allowedTools", "Read", "Glob", "Grep"])
     if model:
         cmd.extend(["--model", model])
     if skill_path:

@@ -3,6 +3,7 @@ name: improve-skill
 description: Use when reviewing, auditing, or improving an existing skill — whether
   it's not triggering correctly, producing poor outputs, too verbose, or you want
   to systematically evaluate and enhance its quality
+allowed-tools: Read, Glob, Grep
 ---
 
 # Improving Skills

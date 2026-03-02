@@ -54,6 +54,7 @@ Every skill has exactly one `SKILL.md` with YAML frontmatter:
 name: skill-name          # letters, numbers, hyphens only
 description: >            # 1024 chars max, third person
   Use when [triggering conditions]. Include specific trigger terms.
+allowed-tools: Read, Glob, Grep   # optional — grant tools without permission prompts
 ---
 ```
 
@@ -62,6 +63,26 @@ description: >            # 1024 chars max, third person
 - Start with "Use when..." and describe triggering conditions only
 - Include specific key terms Claude will match against
 - NEVER summarize the skill's process or workflow (see cso-guide.md for why)
+
+### Declare tool permissions
+
+Skills that reference bundled files (`references/`, `scripts/`, `assets/`) should declare the tools they need in frontmatter using `allowed-tools`. This grants those tools **without permission prompts** when the skill is active.
+
+```yaml
+allowed-tools: Read, Glob, Grep
+```
+
+Keep permissions minimal — only what the skill actually uses:
+- `Read, Glob, Grep` — skill loads reference files or searches project files
+- `Read, Glob, Grep, Bash` — skill also runs bundled scripts
+- `Read` — skill only reads a single reference file
+
+If your skill's scripts spawn `claude -p` subprocesses, those run in separate sessions that don't inherit the skill's permissions. Pass `--allowedTools` in the subprocess command:
+
+```python
+cmd = ["claude", "-p", prompt, "--output-format", "json"]
+cmd.extend(["--allowedTools", "Read", "Glob", "Grep"])
+```
 
 ### Optional: Bundled resources
 
@@ -209,14 +230,30 @@ The output may look correct while the process was wasteful. Review full conversa
 - **Magic constants in scripts:** Document why every number has its value
 - **Punting errors to Claude:** Scripts should handle errors explicitly
 
+## Running Bundled Scripts
+
+Skills that include Python scripts should guide agents to validate the environment before running:
+
+1. **Check Python version** — all skillproof scripts require Python 3.10+ (union type syntax). Before running scripts, verify: `python3 --version`
+2. **Prefer local .venv** — if the project has a `.venv/` directory, activate it first: `source .venv/bin/activate`. This ensures consistent Python version and any needed dependencies.
+3. **Document dependencies** — list external packages (e.g., `anthropic`) in the `__init__.py` prerequisites section so agents know what to install.
+
+Add a **Prerequisites** line to SKILL.md "Bundled Scripts" sections:
+
+```markdown
+**Prerequisites:** Python 3.10+, `claude` CLI. Activate `.venv` if available.
+```
+
 ## Quick Checklist
 
 Before shipping a skill:
 
 - [ ] Description is specific, third-person, includes trigger terms
+- [ ] `allowed-tools` declared if skill references bundled files
 - [ ] SKILL.md body is under 500 lines
 - [ ] Additional detail lives in bundled reference files
 - [ ] Consistent terminology throughout
 - [ ] One excellent example per key pattern
 - [ ] No dead-weight instructions (every line changes behavior)
 - [ ] Tested by reading the full transcript, not just the output
+- [ ] Scripts document Python version and dependencies in `__init__.py`

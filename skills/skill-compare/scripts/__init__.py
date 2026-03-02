@@ -19,5 +19,7 @@ Invoke from the skill-compare directory within the plugin:
         --workspace ./matchup-workspace/iteration-1
 
 Prerequisites:
+    - Python 3.10+ (scripts use union type syntax)
     - claude CLI — required for run_matchup (runs claude -p subprocesses)
+    - If a local .venv exists, activate it first: source .venv/bin/activate
 """
