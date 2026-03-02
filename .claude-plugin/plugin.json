@@ -2,7 +2,10 @@
   "name": "skillproof",
   "version": "1.0.0",
   "description": "Test-driven skill development toolkit for Claude Code. Create, test, evaluate, and optimize skills through a 6-phase TDD process with pressure testing, output comparison, and description optimization.",
-  "author": "Thomas Patane",
+  "author": {
+    "name": "Thomas Patane"
+  },
+  "homepage": "https://github.com/patanet7/skillproof",
   "keywords": [
     "skills",
     "tdd",
@@ -11,5 +14,12 @@
     "evaluation",
     "optimization"
   ],
-  "skills": "skills"
+  "skills": [
+    "./skills/improve-skill",
+    "./skills/skill-compare",
+    "./skills/skill-tdd",
+    "./skills/skill-testing-discipline",
+    "./skills/skill-testing-output",
+    "./skills/writing-skills"
+  ]
 }
