@@ -266,6 +266,24 @@ Meta-test: "The skill was clear, I should follow it"
 - **Adding vague counters** — "Don't cheat" doesn't work. "Don't keep as reference" does
 - **Stopping after first pass** — Tests pass once ≠ bulletproof. Continue until no new rationalizations
 
+## Bundled Resources
+
+Run scripts from the skill-testing-discipline directory within the plugin:
+
+```bash
+cd <plugin-root>/skills/skill-testing-discipline
+```
+
+| Resource | Purpose | When to use |
+|----------|---------|-------------|
+| `python -m scripts.run_pressure_test --skill-path <path> --scenario <file>` | Run pressure scenarios with/without skill | Baseline and evaluation phases |
+| `python -m scripts.run_pressure_test --scenario-dir ./scenarios/ --runs 3` | Run all scenarios multiple times | Statistical significance |
+| `python -m scripts.extract_choice <response.txt>` | Extract A/B/C choice and rationalizations | Analyzing agent responses |
+| `python -m scripts.extract_choice --workspace <path>` | Batch-extract from all responses | Analyzing full workspace |
+| `references/scenario_templates.md` | Ready-to-use pressure scenario templates (3+ pressures) | Writing new scenarios |
+
+**Prerequisites:** `claude` CLI required for `run_pressure_test`.
+
 ## Testing Checklist
 
 **Baseline (watch it fail):**

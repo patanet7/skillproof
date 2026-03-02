@@ -78,7 +78,9 @@ Different skill types get different testing strategies:
 
 ## Bundled Tools
 
-The `writing-skills` skill includes scripts and agents:
+Each skill includes scripts and tooling. Run from the respective skill directory.
+
+### writing-skills (orchestrator)
 
 **Scripts** (run from `skills/writing-skills/`):
 - `python -m scripts.run_loop` — Description optimization loop
@@ -95,6 +97,31 @@ The `writing-skills` skill includes scripts and agents:
 **Eval Viewer** (browser-based):
 - `eval-viewer/generate_review.py` — Interactive review with feedback collection
 
+### skill-tdd
+
+**Scripts** (run from `skills/skill-tdd/`):
+- `python -m scripts.scaffold_skill <name> -o <path>` — Create new skill directory with SKILL.md template
+- `python -m scripts.scaffold_skill <name> -t discipline` — Scaffold with discipline-specific sections
+- `python -m scripts.run_cycle --skill-path <path> --scenario <file>` — Run RED-GREEN comparison cycle
+
+### skill-testing-discipline
+
+**Scripts** (run from `skills/skill-testing-discipline/`):
+- `python -m scripts.run_pressure_test --skill-path <path> --scenario <file>` — Run pressure scenarios with/without skill
+- `python -m scripts.run_pressure_test --scenario-dir ./scenarios/ --runs 3` — Batch run with statistical repetition
+- `python -m scripts.extract_choice <response.txt>` — Extract A/B/C choice and rationalizations from output
+- `python -m scripts.extract_choice --workspace <path>` — Batch-extract from all responses in workspace
+
+**References:**
+- `references/scenario_templates.md` — Ready-to-use pressure scenario templates with 3+ combined pressures
+
+### skill-testing-output
+
+**Scripts** (run from `skills/skill-testing-output/`):
+- `python -m scripts.init_workspace <name> --evals <evals.json>` — Create workspace directory structure
+- `python -m scripts.run_comparison --skill-path <path> --evals <evals.json> --workspace <path>` — Run A/B comparisons
+- `python -m scripts.diff_outputs <workspace>/iteration-N/eval-name` — Compare output files between configs
+
 ## Prerequisites
 
 - **Claude Code CLI** (`claude`) — Required for trigger evaluation (`run_eval.py`)
@@ -106,12 +133,27 @@ pip install anthropic
 
 ## Running Scripts
 
-Scripts use relative imports, so run them as modules from the writing-skills directory:
+Scripts use relative imports, so run them as modules from each skill's directory:
 
 ```bash
+# writing-skills scripts
 cd /path/to/skillproof/skills/writing-skills
 python -m scripts.run_loop --eval-set eval.json --skill-path . --model claude-sonnet-4-20250514 --verbose
 python -m scripts.quick_validate /path/to/any/skill
+
+# skill-tdd scripts
+cd /path/to/skillproof/skills/skill-tdd
+python -m scripts.scaffold_skill my-new-skill -o ~/skills -t workflow
+python -m scripts.run_cycle --skill-path ~/skills/my-skill --scenario test.txt
+
+# skill-testing-discipline scripts
+cd /path/to/skillproof/skills/skill-testing-discipline
+python -m scripts.run_pressure_test --skill-path ~/skills/my-skill --scenario scenario.txt --correct-choice A
+
+# skill-testing-output scripts
+cd /path/to/skillproof/skills/skill-testing-output
+python -m scripts.init_workspace my-skill --evals evals.json -o ./workspace
+python -m scripts.run_comparison --skill-path ~/skills/my-skill --evals evals.json --workspace ./workspace/iteration-1
 ```
 
 ## License

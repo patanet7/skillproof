@@ -205,6 +205,22 @@ it crystal clear that Option A was the only acceptable answer?
 | "Academic review is enough" | Reading does not equal using. Test application scenarios. |
 | "No time to test" | Deploying untested skill wastes more time fixing it later. |
 
+## Bundled Scripts
+
+Run from the skill-tdd directory within the plugin:
+
+```bash
+cd <plugin-root>/skills/skill-tdd
+```
+
+| Script | Purpose | When to use |
+|--------|---------|-------------|
+| `python -m scripts.scaffold_skill <name> -o <path>` | Create new skill directory with SKILL.md template | Starting a new skill |
+| `python -m scripts.scaffold_skill <name> -t discipline` | Scaffold with discipline-specific sections | Creating a discipline skill |
+| `python -m scripts.run_cycle --skill-path <path> --scenario <file>` | Run RED-GREEN cycle (baseline vs with-skill) | Testing a skill's effect |
+
+**Prerequisites:** `claude` CLI required for `run_cycle`.
+
 ## Testing Checklist
 
 **RED Phase:**

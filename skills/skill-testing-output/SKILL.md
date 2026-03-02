@@ -234,6 +234,30 @@ skill-name-workspace/
 
 **Cowork:** Subagents work. Use `--static` for viewer (no browser). Feedback downloads as file.
 
+## Bundled Scripts
+
+Run from the skill-testing-output directory within the plugin:
+
+```bash
+cd <plugin-root>/skills/skill-testing-output
+```
+
+| Script | Purpose | When to use |
+|--------|---------|-------------|
+| `python -m scripts.init_workspace <name> --evals <evals.json>` | Create workspace directory structure | Before running comparisons |
+| `python -m scripts.run_comparison --skill-path <path> --evals <evals.json> --workspace <path>` | Run A/B comparisons via `claude -p` | Executing eval runs |
+| `python -m scripts.run_comparison --baseline-skill <old-path>` | Compare two skill versions | Old vs new skill testing |
+| `python -m scripts.diff_outputs <workspace>/iteration-N/eval-name` | Compare output files between configs | Reviewing output differences |
+
+For grading and benchmarking, use the shared `writing-skills` scripts:
+
+```bash
+cd <plugin-root>/skills/writing-skills
+python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>
+```
+
+**Prerequisites:** `claude` CLI required for `run_comparison`.
+
 ## Testing Checklist
 
 - [ ] Created 2-3 realistic test prompts
