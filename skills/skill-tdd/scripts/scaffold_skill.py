@@ -153,13 +153,9 @@ def main() -> None:
     skill_dir = scaffold(args.name, args.output, args.type)
 
     print(f"Scaffolded skill at: {skill_dir}")
-    print(f"  SKILL.md       — edit frontmatter description and body")
-    print(f"  references/    — add supporting docs")
-    print(f"  scripts/       — add automation scripts")
-    print(f"\nNext steps:")
-    print(f"  1. Edit {skill_dir}/SKILL.md")
-    print(f"  2. Run baseline tests (RED phase)")
-    print(f"  3. Iterate until skill passes tests (GREEN phase)")
+    print(f"  SKILL.md       — frontmatter description and body")
+    print(f"  references/    — supporting docs")
+    print(f"  scripts/       — automation scripts")
 
 
 if __name__ == "__main__":

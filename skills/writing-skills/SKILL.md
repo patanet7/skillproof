@@ -230,6 +230,7 @@ This skill works with independently useful companion skills:
 - **skillproof:skill-testing-discipline** — Pressure testing for rule-enforcement skills
 - **skillproof:skill-testing-output** — Output quality comparison for workflow/technique skills
 - **skillproof:skill-compare** — Head-to-head comparison for choosing between skill versions or competing approaches
+- **skillproof:improve-skill** — Evidence-based skill improvement with structural audit and workspace diagnosis
 
 Each is self-contained but designed to compose. Claude discovers and loads them together when context matches.
 

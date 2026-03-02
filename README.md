@@ -12,7 +12,7 @@ git clone https://github.com/thomaspatane/skillproof.git
 claude --plugin-dir /path/to/skillproof
 ```
 
-Once loaded, you get five slash commands:
+Once loaded, you get six slash commands:
 
 ```
 /skillproof:writing-skills              # The main one. Start here.
@@ -20,6 +20,7 @@ Once loaded, you get five slash commands:
 /skillproof:skill-testing-discipline    # Pressure testing for rule-enforcement skills
 /skillproof:skill-testing-output        # A/B output quality comparison
 /skillproof:skill-compare               # Head-to-head skill comparison
+/skillproof:improve-skill               # Evidence-based skill improvement
 ```
 
 ## How it works
@@ -58,7 +59,7 @@ When Claude loads `writing-skills`, it pulls in the companion skills as needed:
 
 You don't need to invoke these manually. They compose.
 
-## The five skills
+## The six skills
 
 ### `writing-skills` — Orchestrator
 
@@ -117,6 +118,23 @@ Comes with:
 - `summarize_matchup` — produce a matchup report with winner, quantitative comparison, and blind tally
 
 Uses grading, benchmarking, and viewing infrastructure from `writing-skills`.
+
+### `improve-skill` — Evidence-based improvement
+
+For skills that exist but aren't performing well. Reads actual test evidence — grading failures, user feedback, comparison losses, benchmark data — to diagnose what's wrong, then generates a prioritized improvement plan.
+
+Works in two modes:
+- **Audit-only** — structural quality check against best practices (no workspace needed)
+- **Full diagnosis** — audit + evidence extraction from a testing workspace
+
+Comes with:
+- `init_improvement` — scaffold improvement workspace, run audit, generate eval skeleton
+- `audit_skill` — structural quality audit (frontmatter, token budget, anti-patterns, scripts)
+- `diagnose_workspace` — extract failing assertions, complaints, and losses from test workspaces
+- `plan_improvements` — merge audit + diagnosis into a prioritized improvement plan
+- `compare_iterations` — quantitative before/after comparison with regression detection
+
+Flags description issues for `writing-skills` Phase 6 rather than attempting manual fixes.
 
 ## Running scripts manually
 
@@ -185,6 +203,28 @@ python -m scripts.run_loop \
 
 # Aggregate benchmark results
 python -m scripts.aggregate_benchmark ./workspace/iteration-1 --skill-name my-skill
+
+# Initialize improvement workspace (audit + eval skeleton)
+cd /path/to/skillproof/skills/improve-skill
+python -m scripts.init_improvement ~/my-skills/my-skill -o ./workspace
+
+# Standalone structural audit
+python -m scripts.audit_skill ~/my-skills/my-skill --output audit_report.json
+
+# Diagnose issues from a testing workspace
+python -m scripts.diagnose_workspace ./workspace/iteration-1 --output diagnosis.json
+
+# Generate improvement plan (audit + diagnosis)
+python -m scripts.plan_improvements \
+  --audit ./workspace/audit_report.json \
+  --diagnosis ./workspace/diagnosis.json \
+  --output ./workspace/improvement_plan.json
+
+# Compare before/after iterations
+python -m scripts.compare_iterations \
+  --before ./workspace/diagnosis.json \
+  --after ./workspace/diagnosis_v2.json \
+  --output ./workspace/comparison_report.json
 ```
 
 ## Prerequisites
@@ -229,9 +269,12 @@ skillproof/
 │   ├── skill-testing-output/    # A/B comparison
 │   │   ├── SKILL.md
 │   │   └── scripts/             # init_workspace, run_comparison, diff_outputs
-│   └── skill-compare/           # Head-to-head comparison
+│   ├── skill-compare/           # Head-to-head comparison
+│   │   ├── SKILL.md
+│   │   └── scripts/             # init_matchup, run_matchup, summarize_matchup
+│   └── improve-skill/           # Evidence-based improvement
 │       ├── SKILL.md
-│       └── scripts/             # init_matchup, run_matchup, summarize_matchup
+│       └── scripts/             # audit_skill, diagnose_workspace, plan_improvements
 ├── README.md
 └── LICENSE
 ```
