@@ -1,7 +1,6 @@
 """Writing-skills evaluation and improvement scripts.
 
-Invoke from the writing-skills directory within the plugin:
-    cd $SKILLPROOF_ROOT/skills/writing-skills
+Invoke from the writing-skills skill directory:
     python -m scripts.run_loop --eval-set ... --skill-path ...
     python -m scripts.run_eval --eval-set ... --skill-path ...
     python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>

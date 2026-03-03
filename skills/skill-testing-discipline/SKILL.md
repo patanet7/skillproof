@@ -279,11 +279,7 @@ Meta-test: "The skill was clear, I should follow it"
 
 ## Bundled Resources
 
-Run scripts from the skill-testing-discipline directory within the plugin:
-
-```bash
-cd $SKILLPROOF_ROOT/skills/skill-testing-discipline
-```
+Run scripts from this skill's base directory.
 
 | Resource | Purpose | When to use |
 |----------|---------|-------------|

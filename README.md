@@ -14,16 +14,7 @@ claude --plugin-dir /path/to/skillproof
 
 ## Setup
 
-On session start, a hook automatically:
-
-1. Creates `/tmp/skillproof/` for workspace files
-2. Creates a timestamped subdirectory for the current project
-3. Prints two environment variables that Claude uses throughout the session:
-
-- `SKILLPROOF_ROOT` — the plugin's install directory (where scripts and references live)
-- `SKILLPROOF_WORKSPACE` — a timestamped workspace path like `/tmp/skillproof/myproject-20260302-161234`
-
-**All workspace output goes to `/tmp/skillproof/`**, never inside your project repo. Test results, grading files, benchmarks, and timing data all live there. Each skill has scoped permissions to read/write in that directory.
+**All workspace output goes to `/tmp/skillproof/`**, never inside your project repo. Skills create workspace directories on demand — no hooks, no environment variables. `/tmp` is cleaned automatically by the OS on reboot.
 
 To allow Claude to read plugin reference files (e.g., `references/best-practices.md`, `agents/grader.md`) without prompting, add this to your `~/.claude/settings.json`:
 
@@ -165,11 +156,13 @@ Flags description issues for `writing-skills` Phase 6 rather than attempting man
 
 ## Running scripts manually
 
-Scripts use Python relative imports. Always `cd` into the skill directory first:
+Scripts use Python relative imports. Always `cd` into the skill's directory first. When skills are loaded by Claude, it knows the base directory automatically. For manual use, navigate to the skill directory within the plugin:
 
 ```bash
+# ── skill-tdd ──────────────────────────────────────────────
+# cd into skills/skill-tdd
+
 # Scaffold a new skill
-cd $SKILLPROOF_ROOT/skills/skill-tdd
 python -m scripts.scaffold_skill my-new-skill -o ~/my-skills -t discipline
 
 # Run a RED-GREEN cycle
@@ -177,8 +170,10 @@ python -m scripts.run_cycle \
   --skill-path ~/my-skills/my-new-skill \
   --scenario scenario.txt
 
+# ── skill-testing-discipline ───────────────────────────────
+# cd into skills/skill-testing-discipline
+
 # Run pressure tests
-cd $SKILLPROOF_ROOT/skills/skill-testing-discipline
 python -m scripts.run_pressure_test \
   --skill-path ~/my-skills/my-new-skill \
   --scenario scenario.txt \
@@ -188,8 +183,10 @@ python -m scripts.run_pressure_test \
 # Extract choices from responses
 python -m scripts.extract_choice --workspace ./pressure-workspace/20260302T120000
 
+# ── skill-testing-output ───────────────────────────────────
+# cd into skills/skill-testing-output
+
 # Initialize A/B comparison workspace
-cd $SKILLPROOF_ROOT/skills/skill-testing-output
 python -m scripts.init_workspace my-skill --evals evals.json -o /tmp/skillproof/my-skill-workspace
 
 # Run A/B comparisons
@@ -201,8 +198,10 @@ python -m scripts.run_comparison \
 # Diff the outputs
 python -m scripts.diff_outputs /tmp/skillproof/my-skill-workspace/iteration-1/eval-my-test
 
+# ── skill-compare ──────────────────────────────────────────
+# cd into skills/skill-compare
+
 # Initialize matchup workspace (two-skill comparison)
-cd $SKILLPROOF_ROOT/skills/skill-compare
 python -m scripts.init_matchup \
   --skill-a ~/my-skills/my-skill-v1 \
   --skill-b ~/my-skills/my-skill-v2 \
@@ -217,8 +216,10 @@ python -m scripts.run_matchup \
 python -m scripts.summarize_matchup \
   --workspace /tmp/skillproof/my-matchup/iteration-1
 
+# ── writing-skills ─────────────────────────────────────────
+# cd into skills/writing-skills
+
 # Validate skill structure
-cd $SKILLPROOF_ROOT/skills/writing-skills
 python -m scripts.quick_validate ~/my-skills/my-new-skill
 
 # Optimize description (requires anthropic SDK)
@@ -231,8 +232,10 @@ python -m scripts.run_loop \
 # Aggregate benchmark results
 python -m scripts.aggregate_benchmark /tmp/skillproof/my-skill-workspace/iteration-1 --skill-name my-skill
 
+# ── improve-skill ──────────────────────────────────────────
+# cd into skills/improve-skill
+
 # Initialize improvement workspace (audit + eval skeleton)
-cd $SKILLPROOF_ROOT/skills/improve-skill
 python -m scripts.init_improvement ~/my-skills/my-skill -o /tmp/skillproof/my-skill-improvement
 
 # Standalone structural audit

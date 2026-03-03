@@ -1,7 +1,6 @@
 """Improve-skill scripts for evidence-based skill improvement.
 
-Invoke from the improve-skill directory within the plugin:
-    cd $SKILLPROOF_ROOT/skills/improve-skill
+Invoke from the improve-skill skill directory:
 
     # Initialize improvement workspace (runs audit + scaffolds evals)
     python -m scripts.init_improvement /path/to/skill -o /tmp/skillproof/<skill-name>-improvement

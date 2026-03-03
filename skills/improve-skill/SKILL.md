@@ -32,11 +32,11 @@ Evidence-based skill improvement. Audit the skill's structure, test it against r
 Initialize the improvement workspace. This runs the structural audit and auto-generates evals from the skill's checklist items and step headings:
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/improve-skill
+# From this skill's base directory:
 python -m scripts.init_improvement /path/to/skill -o /tmp/skillproof/<skill-name>-improvement
 ```
 
-**Important:** Always use `/tmp/skillproof/` (or another path outside the project repo) for workspace output. The SessionStart hook creates this directory automatically.
+**Important:** Always use `/tmp/skillproof/` (or another path outside the project repo) for workspace output. Create directories on demand with `mkdir -p`.
 
 Review `audit_report.json` for structural findings. Review `evals.json` — the generated assertions come from the skill's own checklist, so they should be meaningful. Refine any that don't capture key behaviors well enough.
 
@@ -115,7 +115,7 @@ Don't fix descriptions here — use `writing-skills` Phase 6 description optimiz
 
 ## Bundled Scripts
 
-Run from the improve-skill directory: `cd $SKILLPROOF_ROOT/skills/improve-skill`
+Run scripts from this skill's base directory.
 
 | Script | Purpose | Step |
 |--------|---------|------|

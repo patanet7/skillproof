@@ -178,7 +178,6 @@ Present eval set via `assets/eval_review.html` or structured list. User confirms
 **Step 3: Run optimization loop**
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/writing-skills
 python -m scripts.run_loop \
   --eval-set <path-to-eval.json> \
   --skill-path <path-to-skill> \

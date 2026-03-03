@@ -5,7 +5,8 @@
 - `allowed-tools` in SKILL.md frontmatter is a WHITELIST — omitting Bash blocks all script execution
 - `${CLAUDE_PLUGIN_ROOT}` is config-time substitution only — works in plugin.json hooks/MCP configs, NOT as a shell env var
 - Plugin.json cannot declare file permissions — only user settings.json can
-- SessionStart hook prints `SKILLPROOF_ROOT` and `SKILLPROOF_WORKSPACE` — use these in skill instructions
+- No SessionStart hook — skills create workspaces on demand via `mkdir -p /tmp/skillproof/...`
+- Claude Code tells each skill its base directory at load time — use that to navigate to sibling skills
 
 ## Skill File Organization
 
@@ -18,12 +19,13 @@
 ## Workspace Output
 
 - NEVER use `./workspace` or relative paths in skill examples — agents take them literally and create files inside repos
-- Always use `/tmp/skillproof/` — the SessionStart hook creates a timestamped subdirectory with project name
-- Pattern: `/tmp/skillproof/<project>-<YYYYMMDD-HHMMSS>/`
+- Always use `/tmp/skillproof/` — skills create subdirectories on demand with `mkdir -p`
+- Pattern: `/tmp/skillproof/<skill-name>-<workspace>/`
+- `/tmp` is cleaned by the OS on reboot — no manual cleanup needed
 
 ## Scripts
 
-- All Python scripts require `cd $SKILLPROOF_ROOT/skills/<skill-name>` before `python -m scripts.*`
+- All Python scripts require `cd` into the skill's base directory before `python -m scripts.*`
 - Python 3.10+ required (union type syntax)
 - `claude` CLI required for scripts that spawn subprocesses
 - `anthropic` pip package only needed for description optimization (writing-skills Phase 6)

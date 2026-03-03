@@ -1,7 +1,6 @@
 """Skill-compare scripts for head-to-head skill comparison.
 
-Invoke from the skill-compare directory within the plugin:
-    cd $SKILLPROOF_ROOT/skills/skill-compare
+Invoke from the skill-compare skill directory:
 
     # Initialize matchup workspace
     python -m scripts.init_matchup \\

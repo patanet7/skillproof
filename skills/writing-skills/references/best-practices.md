@@ -255,7 +255,7 @@ When a skill ships both `.sh` and `.py` versions, document the shell version as 
 - Always `set -euo pipefail`
 - Use `node -e` for JSON parsing (never `jq` — it's not guaranteed)
 - Pass JSON strings as `process.argv[1]` to node, not via stdin or string interpolation
-- Use `$SKILLPROOF_ROOT` and `$SKILLPROOF_WORKSPACE` environment variables
+- Use `/tmp/skillproof/` for workspace output (create with `mkdir -p` on first use)
 
 ```bash
 # JSON parsing pattern — use this, not jq

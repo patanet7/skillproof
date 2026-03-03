@@ -142,7 +142,7 @@ See `schemas.md` for the benchmark.json format.
 Launch the browser-based reviewer:
 
 ```bash
-nohup python $SKILLPROOF_ROOT/skills/writing-skills/eval-viewer/generate_review.py \
+nohup python ../writing-skills/eval-viewer/generate_review.py \
   <workspace>/iteration-N \
   --skill-name "my-skill" \
   --benchmark <workspace>/iteration-N/benchmark.json \
@@ -249,9 +249,7 @@ skill-name-workspace/
 
 Run from the skill-testing-output directory within the plugin:
 
-```bash
-cd $SKILLPROOF_ROOT/skills/skill-testing-output
-```
+Run scripts from this skill's base directory.
 
 | Script | Purpose | When to use |
 |--------|---------|-------------|
@@ -263,7 +261,7 @@ cd $SKILLPROOF_ROOT/skills/skill-testing-output
 For grading and benchmarking, use the shared `writing-skills` scripts:
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/writing-skills
+# From the writing-skills sibling directory (../writing-skills):
 python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>
 ```
 

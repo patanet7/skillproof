@@ -66,7 +66,7 @@ Key: prompts must be fair to both skills. Don't write prompts that favor one app
 ## Step 3: Initialize Workspace
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/skill-compare
+# From this skill's base directory:
 python -m scripts.init_matchup \
     --skill-a /path/to/skill-a \
     --skill-b /path/to/skill-b \
@@ -75,7 +75,7 @@ python -m scripts.init_matchup \
     --runs 3
 ```
 
-**Important:** Always use `/tmp/skillproof/` (or another path outside the project repo) for workspace output. The SessionStart hook creates this directory automatically.
+**Important:** Always use `/tmp/skillproof/` (or another path outside the project repo) for workspace output. Create directories on demand with `mkdir -p`.
 
 This creates the workspace with `matchup.json`, eval directories, and `run-N/outputs/` per eval per config per run.
 
@@ -107,7 +107,7 @@ The grader evaluates each assertion as PASS/FAIL with evidence, extracts implici
 Run the shared benchmark aggregator from writing-skills:
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/writing-skills
+# From the writing-skills sibling directory (../writing-skills):
 python -m scripts.aggregate_benchmark \
     <workspace>/iteration-1 \
     --skill-name "matchup-name"
@@ -164,7 +164,7 @@ This is optional — most useful when results are close and you want to understa
 **Launch the eval viewer** for visual review:
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/writing-skills
+# From the writing-skills sibling directory (../writing-skills):
 nohup python eval-viewer/generate_review.py \
     <workspace>/iteration-1 \
     --skill-name "matchup-name" \
@@ -175,7 +175,7 @@ nohup python eval-viewer/generate_review.py \
 **Generate the matchup report:**
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/skill-compare
+# From this skill's base directory:
 python -m scripts.summarize_matchup \
     --workspace ./matchup-workspace/iteration-1
 ```
@@ -219,7 +219,7 @@ This layout is compatible with `aggregate_benchmark.py` (discovers configs dynam
 Run from the skill-compare directory within the plugin:
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/skill-compare
+# From this skill's base directory:
 ```
 
 | Script | Purpose | When to use |
@@ -231,7 +231,7 @@ cd $SKILLPROOF_ROOT/skills/skill-compare
 For grading, benchmarking, and viewing, use the shared `writing-skills` scripts:
 
 ```bash
-cd $SKILLPROOF_ROOT/skills/writing-skills
+# From the writing-skills sibling directory (../writing-skills):
 python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>
 python eval-viewer/generate_review.py <workspace>/iteration-N --skill-name <name>
 ```

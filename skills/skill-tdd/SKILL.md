@@ -232,11 +232,7 @@ it crystal clear that Option A was the only acceptable answer?
 
 ## Bundled Scripts
 
-Run from the skill-tdd directory within the plugin:
-
-```bash
-cd $SKILLPROOF_ROOT/skills/skill-tdd
-```
+Run scripts from this skill's base directory.
 
 ### Shell scripts (preferred — no Python required)
 

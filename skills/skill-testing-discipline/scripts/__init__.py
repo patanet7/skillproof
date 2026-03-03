@@ -1,7 +1,6 @@
 """Skill-testing-discipline scripts for pressure testing.
 
-Invoke from the skill-testing-discipline directory within the plugin:
-    cd $SKILLPROOF_ROOT/skills/skill-testing-discipline
+Invoke from the skill-testing-discipline skill directory:
     python -m scripts.run_pressure_test --skill-path <path> --scenario <file>
     python -m scripts.extract_choice <response-file>
 
