@@ -8,7 +8,7 @@ You tell Claude what skill you want. It runs agents without the skill, watches t
 
 ```bash
 # Clone and point Claude at it
-git clone https://github.com/thomaspatane/skillproof.git
+git clone https://github.com/patanet7/skillproof.git
 claude --plugin-dir /path/to/skillproof
 ```
 
@@ -312,7 +312,8 @@ skillproof/
 ├── .claude-plugin/plugin.json
 ├── skills/
 │   ├── _shared/                 # Cross-skill utilities
-│   │   └── claude_runner.py     # Shared claude -p runner with full metrics capture
+│   │   ├── claude_runner.py     # Python runner with RunResult dataclass
+│   │   └── run_claude.sh        # Shell runner (bash + node, no Python needed)
 │   ├── writing-skills/          # Orchestrator — 6-phase flow
 │   │   ├── SKILL.md
 │   │   ├── scripts/             # run_loop, run_eval, aggregate_benchmark, quick_validate, ...
