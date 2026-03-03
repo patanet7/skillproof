@@ -17,12 +17,13 @@ Expects workspace to be initialized with init_matchup.py first.
 
 import argparse
 import json
-import os
-import subprocess
 import sys
-import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+
+# Add _shared to import path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "_shared"))
+from claude_runner import run_claude, save_timing  # noqa: E402
 
 
 def run_single_eval(
@@ -35,55 +36,26 @@ def run_single_eval(
     """Run a single eval prompt via `claude -p` and save outputs.
 
     Returns:
-        dict with duration_seconds, exit_code, response_length
+        dict with duration_seconds, exit_code, response_length, tokens, cost_usd
     """
-    cmd = ["claude", "-p", prompt, "--output-format", "json"]
-    cmd.extend(["--allowedTools", "Read", "Glob", "Grep"])
-    if model:
-        cmd.extend(["--model", model])
-    cmd.extend(["--skill-path", str(skill_path)])
+    result = run_claude(
+        prompt=prompt,
+        skill_path=skill_path,
+        timeout=timeout,
+        model=model,
+        cwd=output_dir,
+    )
 
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-    start = time.monotonic()
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=str(output_dir),
-            env=env,
-        )
-        duration = time.monotonic() - start
-    except subprocess.TimeoutExpired:
-        (output_dir / "response.txt").write_text(f"[TIMEOUT after {timeout}s]")
-        return {
-            "duration_seconds": timeout,
-            "exit_code": -1,
-            "response_length": 0,
-        }
-
-    response_text = result.stdout
-    try:
-        parsed = json.loads(response_text)
-        response_text = parsed.get("result", response_text)
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    (output_dir / "response.txt").write_text(response_text)
-
-    # Save timing to run dir (parent of outputs/)
-    timing = {
-        "duration_ms": int(duration * 1000),
-        "total_duration_seconds": round(duration, 2),
-    }
-    (output_dir.parent / "timing.json").write_text(json.dumps(timing, indent=2))
+    (output_dir / "response.txt").write_text(result.response)
+    save_timing(result, output_dir.parent / "timing.json")
 
     return {
-        "duration_seconds": round(duration, 2),
-        "exit_code": result.returncode,
-        "response_length": len(response_text),
+        "duration_seconds": result.total_duration_seconds,
+        "exit_code": result.exit_code,
+        "response_length": len(result.response),
+        "total_tokens": result.total_tokens,
+        "cost_usd": result.cost_usd,
+        "num_turns": result.num_turns,
     }
 
 
@@ -174,9 +146,13 @@ def run_matchup(
                     if result["exit_code"] == 0
                     else f"EXIT={result['exit_code']}"
                 )
+                tokens = result.get("total_tokens", 0)
+                cost = result.get("cost_usd", 0)
                 print(
                     f"  [{status}] {label} "
                     f"({result['duration_seconds']:.1f}s, "
+                    f"{tokens:,} tokens, "
+                    f"${cost:.4f}, "
                     f"{result['response_length']} chars)"
                 )
                 results[label] = result

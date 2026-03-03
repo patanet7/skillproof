@@ -90,6 +90,14 @@ description: Use when [specific triggering conditions and symptoms]
 - <!-- Explicit exclusions -->
 
 {sections}
+## Bundled Scripts
+
+Write scripts in **bash** by default. Use `node -e` for JSON parsing (guaranteed by Claude Code). Only use Python for complex analysis that would be unwieldy in shell.
+
+| Script | Purpose |
+|--------|---------|
+| <!-- `bash scripts/example.sh` --> | <!-- Description --> |
+
 ## Testing Checklist
 
 - [ ] Ran baseline WITHOUT skill, documented failures verbatim
@@ -112,7 +120,6 @@ def scaffold(name: str, output_dir: Path, skill_type: str) -> Path:
     (skill_dir / "references").mkdir()
     scripts_dir = skill_dir / "scripts"
     scripts_dir.mkdir()
-    (scripts_dir / "__init__.py").write_text("")
 
     # Write SKILL.md
     content = generate_skill_md(name, skill_type)

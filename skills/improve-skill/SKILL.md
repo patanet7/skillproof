@@ -3,7 +3,7 @@ name: improve-skill
 description: Use when reviewing, auditing, or improving an existing skill — whether
   it's not triggering correctly, producing poor outputs, too verbose, or you want
   to systematically evaluate and enhance its quality
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash(cd *), Bash(bash *), Bash(python *), Bash(mkdir *), Read(/tmp/skillproof/**), Write(/tmp/skillproof/**), Edit(/tmp/skillproof/**)
 ---
 
 # Improving Skills
@@ -32,8 +32,11 @@ Evidence-based skill improvement. Audit the skill's structure, test it against r
 Initialize the improvement workspace. This runs the structural audit and auto-generates evals from the skill's checklist items and step headings:
 
 ```bash
-python -m scripts.init_improvement /path/to/skill -o ./workspace
+cd $SKILLPROOF_ROOT/skills/improve-skill
+python -m scripts.init_improvement /path/to/skill -o /tmp/skillproof/<skill-name>-improvement
 ```
+
+**Important:** Always use `/tmp/skillproof/` (or another path outside the project repo) for workspace output. The SessionStart hook creates this directory automatically.
 
 Review `audit_report.json` for structural findings. Review `evals.json` — the generated assertions come from the skill's own checklist, so they should be meaningful. Refine any that don't capture key behaviors well enough.
 
@@ -48,7 +51,7 @@ python -m scripts.init_workspace <name> --evals <workspace>/evals.json -o <works
 python -m scripts.run_comparison --skill-path /path/to/skill --evals <workspace>/evals.json --workspace <workspace>/iteration-1
 ```
 
-Grade the results with the `writing-skills/agents/grader.md` subagent. Aggregate benchmarks:
+Grade the results with the `grader.md` subagent. Aggregate benchmarks:
 
 ```bash
 python -m scripts.aggregate_benchmark <workspace>/iteration-1 --skill-name <name>
@@ -111,6 +114,8 @@ If the audit flagged description problems (workflow summary, missing "Use when",
 Don't fix descriptions here — use `writing-skills` Phase 6 description optimization loop for systematic eval-based scoring.
 
 ## Bundled Scripts
+
+Run from the improve-skill directory: `cd $SKILLPROOF_ROOT/skills/improve-skill`
 
 | Script | Purpose | Step |
 |--------|---------|------|

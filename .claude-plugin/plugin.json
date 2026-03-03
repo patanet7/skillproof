@@ -1,6 +1,6 @@
 {
   "name": "skillproof",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Test-driven skill development toolkit for Claude Code. Create, test, evaluate, and optimize skills through a 6-phase TDD process with pressure testing, output comparison, and description optimization.",
   "author": {
     "name": "Thomas Patane"
@@ -21,5 +21,17 @@
     "./skills/skill-testing-discipline",
     "./skills/skill-testing-output",
     "./skills/writing-skills"
-  ]
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "SKILLPROOF_WS=/tmp/skillproof/$(basename $(pwd))-$(date +%Y%m%d-%H%M%S) && mkdir -p \"$SKILLPROOF_WS\" && echo 'SKILLPROOF_ROOT=${CLAUDE_PLUGIN_ROOT}' && echo \"SKILLPROOF_WORKSPACE=$SKILLPROOF_WS\""
+          }
+        ]
+      }
+    ]
+  }
 }

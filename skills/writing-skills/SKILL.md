@@ -1,7 +1,7 @@
 ---
 name: writing-skills
 description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash(cd *), Bash(bash *), Bash(python *), Bash(mkdir *), Read(/tmp/skillproof/**), Write(/tmp/skillproof/**), Edit(/tmp/skillproof/**)
 ---
 
 # Writing Skills
@@ -149,7 +149,7 @@ Improve the skill based on evaluation results. Route by type.
 - Generalize from feedback (don't overfit to test cases)
 - Keep prompts lean (remove what's not pulling weight)
 - Explain the why (theory of mind beats heavy MUSTs)
-- Bundle repeated work into `scripts/` (if agents keep writing the same helper)
+- Bundle repeated work into `scripts/` — **prefer shell scripts** (bash + node for JSON). Use Python only for complex analysis. See `references/best-practices.md` "Running Bundled Scripts."
 - Read transcripts, not just outputs
 
 **Repeat Phases 4-5 until:**
@@ -178,7 +178,7 @@ Present eval set via `assets/eval_review.html` or structured list. User confirms
 **Step 3: Run optimization loop**
 
 ```bash
-cd <plugin-root>/skills/writing-skills
+cd $SKILLPROOF_ROOT/skills/writing-skills
 python -m scripts.run_loop \
   --eval-set <path-to-eval.json> \
   --skill-path <path-to-skill> \

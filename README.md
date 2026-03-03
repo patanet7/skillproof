@@ -12,6 +12,33 @@ git clone https://github.com/thomaspatane/skillproof.git
 claude --plugin-dir /path/to/skillproof
 ```
 
+## Setup
+
+On session start, a hook automatically:
+
+1. Creates `/tmp/skillproof/` for workspace files
+2. Creates a timestamped subdirectory for the current project
+3. Prints two environment variables that Claude uses throughout the session:
+
+- `SKILLPROOF_ROOT` — the plugin's install directory (where scripts and references live)
+- `SKILLPROOF_WORKSPACE` — a timestamped workspace path like `/tmp/skillproof/myproject-20260302-161234`
+
+**All workspace output goes to `/tmp/skillproof/`**, never inside your project repo. Test results, grading files, benchmarks, and timing data all live there. Each skill has scoped permissions to read/write in that directory.
+
+To allow Claude to read plugin reference files (e.g., `references/best-practices.md`, `agents/grader.md`) without prompting, add this to your `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Read(~/.claude/plugins/cache/**)"
+    ]
+  }
+}
+```
+
+This is a one-time setup. Without it, Claude will prompt for permission each time a skill reads a reference file from the plugin cache.
+
 Once loaded, you get six slash commands:
 
 ```
@@ -142,7 +169,7 @@ Scripts use Python relative imports. Always `cd` into the skill directory first:
 
 ```bash
 # Scaffold a new skill
-cd /path/to/skillproof/skills/skill-tdd
+cd $SKILLPROOF_ROOT/skills/skill-tdd
 python -m scripts.scaffold_skill my-new-skill -o ~/my-skills -t discipline
 
 # Run a RED-GREEN cycle
@@ -151,7 +178,7 @@ python -m scripts.run_cycle \
   --scenario scenario.txt
 
 # Run pressure tests
-cd /path/to/skillproof/skills/skill-testing-discipline
+cd $SKILLPROOF_ROOT/skills/skill-testing-discipline
 python -m scripts.run_pressure_test \
   --skill-path ~/my-skills/my-new-skill \
   --scenario scenario.txt \
@@ -162,36 +189,36 @@ python -m scripts.run_pressure_test \
 python -m scripts.extract_choice --workspace ./pressure-workspace/20260302T120000
 
 # Initialize A/B comparison workspace
-cd /path/to/skillproof/skills/skill-testing-output
-python -m scripts.init_workspace my-skill --evals evals.json -o ./workspace
+cd $SKILLPROOF_ROOT/skills/skill-testing-output
+python -m scripts.init_workspace my-skill --evals evals.json -o /tmp/skillproof/my-skill-workspace
 
 # Run A/B comparisons
 python -m scripts.run_comparison \
   --skill-path ~/my-skills/my-new-skill \
   --evals evals.json \
-  --workspace ./workspace/iteration-1
+  --workspace /tmp/skillproof/my-skill-workspace/iteration-1
 
 # Diff the outputs
-python -m scripts.diff_outputs ./workspace/iteration-1/eval-my-test
+python -m scripts.diff_outputs /tmp/skillproof/my-skill-workspace/iteration-1/eval-my-test
 
 # Initialize matchup workspace (two-skill comparison)
-cd /path/to/skillproof/skills/skill-compare
+cd $SKILLPROOF_ROOT/skills/skill-compare
 python -m scripts.init_matchup \
   --skill-a ~/my-skills/my-skill-v1 \
   --skill-b ~/my-skills/my-skill-v2 \
   --evals evals.json \
-  --output ./matchup-workspace --runs 3
+  --output /tmp/skillproof/my-matchup --runs 3
 
 # Run both skills against all evals
 python -m scripts.run_matchup \
-  --workspace ./matchup-workspace/iteration-1
+  --workspace /tmp/skillproof/my-matchup/iteration-1
 
 # Summarize matchup results
 python -m scripts.summarize_matchup \
-  --workspace ./matchup-workspace/iteration-1
+  --workspace /tmp/skillproof/my-matchup/iteration-1
 
 # Validate skill structure
-cd /path/to/skillproof/skills/writing-skills
+cd $SKILLPROOF_ROOT/skills/writing-skills
 python -m scripts.quick_validate ~/my-skills/my-new-skill
 
 # Optimize description (requires anthropic SDK)
@@ -202,38 +229,70 @@ python -m scripts.run_loop \
   --verbose
 
 # Aggregate benchmark results
-python -m scripts.aggregate_benchmark ./workspace/iteration-1 --skill-name my-skill
+python -m scripts.aggregate_benchmark /tmp/skillproof/my-skill-workspace/iteration-1 --skill-name my-skill
 
 # Initialize improvement workspace (audit + eval skeleton)
-cd /path/to/skillproof/skills/improve-skill
-python -m scripts.init_improvement ~/my-skills/my-skill -o ./workspace
+cd $SKILLPROOF_ROOT/skills/improve-skill
+python -m scripts.init_improvement ~/my-skills/my-skill -o /tmp/skillproof/my-skill-improvement
 
 # Standalone structural audit
 python -m scripts.audit_skill ~/my-skills/my-skill --output audit_report.json
 
 # Diagnose issues from a testing workspace
-python -m scripts.diagnose_workspace ./workspace/iteration-1 --output diagnosis.json
+python -m scripts.diagnose_workspace /tmp/skillproof/my-skill-improvement/iteration-1 --output diagnosis.json
 
 # Generate improvement plan (audit + diagnosis)
 python -m scripts.plan_improvements \
-  --audit ./workspace/audit_report.json \
-  --diagnosis ./workspace/diagnosis.json \
-  --output ./workspace/improvement_plan.json
+  --audit /tmp/skillproof/my-skill-improvement/audit_report.json \
+  --diagnosis /tmp/skillproof/my-skill-improvement/diagnosis.json \
+  --output /tmp/skillproof/my-skill-improvement/improvement_plan.json
 
 # Compare before/after iterations
 python -m scripts.compare_iterations \
-  --before ./workspace/diagnosis.json \
-  --after ./workspace/diagnosis_v2.json \
-  --output ./workspace/comparison_report.json
+  --before /tmp/skillproof/my-skill-improvement/diagnosis.json \
+  --after /tmp/skillproof/my-skill-improvement/diagnosis_v2.json \
+  --output /tmp/skillproof/my-skill-improvement/comparison_report.json
+```
+
+## Metrics
+
+Every test run automatically captures full metrics from the Claude API — no estimation, no word counting:
+
+| Metric | Description |
+|--------|-------------|
+| **Input tokens** | API input tokens consumed |
+| **Output tokens** | API output tokens generated |
+| **Total tokens** | Input + output |
+| **Cost (USD)** | Actual API cost |
+| **Duration** | Wall-clock and API-only timing |
+| **Turns** | Number of agentic tool-use rounds |
+| **Permission denials** | Tools the agent tried to use but was blocked from |
+
+These metrics are captured in `timing.json` for every run and aggregated into benchmark reports with mean, stddev, and delta between configurations. The TDD cycle prints a comparison table at the end:
+
+```
+============================================================
+  TDD Cycle Results: my-skill
+============================================================
+  Metric               Baseline   With Skill        Delta
+  -------------------- ---------- ------------ ----------
+  Tokens                   12,450       18,200     +5,750
+  Cost                    $0.0031      $0.0058    $0.0027
+  Duration                  23.1s        34.5s     +11.4s
+  Turns                         3            5         +2
+============================================================
 ```
 
 ## Prerequisites
 
+- **Python 3.10+** — required for running scripts (uses `X | Y` union type syntax)
 - **Claude Code CLI** (`claude`) — all testing scripts use `claude -p` under the hood
-- **Python 3.10+** — for running scripts
 - **anthropic** Python package — only needed for description optimization (Phase 6)
 
 ```bash
+# Verify Python version
+python3 --version  # must be 3.10 or higher
+
 pip install anthropic  # optional, only for Phase 6
 ```
 
@@ -252,6 +311,8 @@ pip install anthropic  # optional, only for Phase 6
 skillproof/
 ├── .claude-plugin/plugin.json
 ├── skills/
+│   ├── _shared/                 # Cross-skill utilities
+│   │   └── claude_runner.py     # Shared claude -p runner with full metrics capture
 │   ├── writing-skills/          # Orchestrator — 6-phase flow
 │   │   ├── SKILL.md
 │   │   ├── scripts/             # run_loop, run_eval, aggregate_benchmark, quick_validate, ...

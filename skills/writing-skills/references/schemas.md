@@ -196,15 +196,52 @@ Output from the executor agent. Located at `<run-dir>/outputs/metrics.json`.
 
 ## timing.json
 
-Wall clock timing for a run. Located at `<run-dir>/timing.json`.
+Run metrics captured from `claude -p --output-format json`. Located at `<run-dir>/timing.json`.
 
-**How to capture:** When a subagent task completes, the task notification includes `total_tokens` and `duration_ms`. Save these immediately — they are not persisted anywhere else and cannot be recovered after the fact.
+**How it works:** All test scripts use the shared `_shared/claude_runner.py` module, which parses the full JSON response from `claude -p` and writes all available metrics. Token counts, cost, and turns come directly from the API — no estimation needed.
 
 ```json
 {
+  "input_tokens": 72100,
+  "output_tokens": 12752,
   "total_tokens": 84852,
+  "cache_creation_input_tokens": 0,
+  "cache_read_input_tokens": 8400,
+  "cost_usd": 0.0234,
   "duration_ms": 23332,
+  "duration_api_ms": 19000,
   "total_duration_seconds": 23.3,
+  "num_turns": 5,
+  "session_id": "abc-123-def",
+  "is_error": false,
+  "exit_code": 0,
+  "permission_denials": [],
+  "response_length": 4521
+}
+```
+
+**Fields:**
+- `input_tokens`: API input tokens consumed
+- `output_tokens`: API output tokens generated
+- `total_tokens`: Sum of input + output
+- `cache_creation_input_tokens`: Tokens used to create prompt cache
+- `cache_read_input_tokens`: Tokens served from prompt cache
+- `cost_usd`: Total API cost in USD
+- `duration_ms`: Total wall-clock duration from `claude -p`
+- `duration_api_ms`: Time spent on API calls only
+- `total_duration_seconds`: `duration_ms / 1000` (for backward compatibility)
+- `num_turns`: Number of agentic turns (tool use rounds)
+- `session_id`: Claude Code session ID
+- `is_error`: Whether the run ended in error
+- `exit_code`: Process exit code
+- `permission_denials`: Array of tool calls that were denied (empty = no friction)
+- `response_length`: Character count of the response text
+
+**Backward compatibility:** Old timing.json files with only `duration_ms` and `total_duration_seconds` still work — missing fields default to 0/empty.
+
+**Subagent runs:** When the grader or other subagent provides executor/grader timing, those fields can be added alongside:
+```json
+{
   "executor_start": "2026-01-15T10:30:00Z",
   "executor_end": "2026-01-15T10:32:45Z",
   "executor_duration_seconds": 165.0,
@@ -245,8 +282,13 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
         "total": 7,
         "time_seconds": 42.5,
         "tokens": 3800,
+        "input_tokens": 3200,
+        "output_tokens": 600,
+        "cost_usd": 0.0098,
+        "num_turns": 5,
         "tool_calls": 18,
-        "errors": 0
+        "errors": 0,
+        "permission_denials": 0
       },
       "expectations": [
         {"text": "...", "passed": true, "evidence": "..."}
@@ -262,17 +304,29 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
     "with_skill": {
       "pass_rate": {"mean": 0.85, "stddev": 0.05, "min": 0.80, "max": 0.90},
       "time_seconds": {"mean": 45.0, "stddev": 12.0, "min": 32.0, "max": 58.0},
-      "tokens": {"mean": 3800, "stddev": 400, "min": 3200, "max": 4100}
+      "tokens": {"mean": 3800, "stddev": 400, "min": 3200, "max": 4100},
+      "input_tokens": {"mean": 3200, "stddev": 350, "min": 2800, "max": 3600},
+      "output_tokens": {"mean": 600, "stddev": 80, "min": 500, "max": 700},
+      "cost_usd": {"mean": 0.0098, "stddev": 0.001, "min": 0.008, "max": 0.011},
+      "num_turns": {"mean": 5.0, "stddev": 1.0, "min": 4.0, "max": 6.0}
     },
     "without_skill": {
       "pass_rate": {"mean": 0.35, "stddev": 0.08, "min": 0.28, "max": 0.45},
       "time_seconds": {"mean": 32.0, "stddev": 8.0, "min": 24.0, "max": 42.0},
-      "tokens": {"mean": 2100, "stddev": 300, "min": 1800, "max": 2500}
+      "tokens": {"mean": 2100, "stddev": 300, "min": 1800, "max": 2500},
+      "input_tokens": {"mean": 1800, "stddev": 250, "min": 1500, "max": 2100},
+      "output_tokens": {"mean": 300, "stddev": 60, "min": 250, "max": 400},
+      "cost_usd": {"mean": 0.0052, "stddev": 0.0008, "min": 0.004, "max": 0.006},
+      "num_turns": {"mean": 3.0, "stddev": 0.5, "min": 2.0, "max": 4.0}
     },
     "delta": {
       "pass_rate": "+0.50",
       "time_seconds": "+13.0",
-      "tokens": "+1700"
+      "tokens": "+1700",
+      "input_tokens": "+1400",
+      "output_tokens": "+300",
+      "cost_usd": "+0.004600",
+      "num_turns": "+2.0"
     }
   },
 
@@ -296,10 +350,10 @@ Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.
   - `eval_name`: Human-readable eval name (used as section header in the viewer)
   - `configuration`: Must be `"with_skill"` or `"without_skill"` (the viewer uses this exact string for grouping and color coding)
   - `run_number`: Integer run number (1, 2, 3...)
-  - `result`: Nested object with `pass_rate`, `passed`, `total`, `time_seconds`, `tokens`, `errors`
+  - `result`: Nested object with `pass_rate`, `passed`, `total`, `time_seconds`, `tokens`, `input_tokens`, `output_tokens`, `cost_usd`, `num_turns`, `errors`, `permission_denials`
 - `run_summary`: Statistical aggregates per configuration
-  - `with_skill` / `without_skill`: Each contains `pass_rate`, `time_seconds`, `tokens` objects with `mean` and `stddev` fields
-  - `delta`: Difference strings like `"+0.50"`, `"+13.0"`, `"+1700"`
+  - `with_skill` / `without_skill`: Each contains `pass_rate`, `time_seconds`, `tokens`, `input_tokens`, `output_tokens`, `cost_usd`, `num_turns` — each with `mean`, `stddev`, `min`, `max`
+  - `delta`: Difference strings like `"+0.50"`, `"+13.0"`, `"+1700"`, `"+0.004600"`
 - `notes`: Freeform observations from the analyzer
 
 **Important:** The viewer reads these field names exactly. Using `config` instead of `configuration`, or putting `pass_rate` at the top level of a run instead of nested under `result`, will cause the viewer to show empty/zero values. Always reference this schema when generating benchmark.json manually.

@@ -21,13 +21,13 @@ Usage:
         --skill-a /path/to/skill-a \\
         --skill-b /path/to/skill-b \\
         --evals evals.json \\
-        --output ./matchup-workspace
+        --output /tmp/skillproof/<matchup-name>
 
     python -m scripts.init_matchup \\
         --skill-a /path/to/skill-a \\
         --skill-b /path/to/skill-b \\
         --evals evals.json \\
-        --output ./matchup-workspace \\
+        --output /tmp/skillproof/<matchup-name> \\
         --iteration 2 --runs 5
 """
 

@@ -232,16 +232,59 @@ The output may look correct while the process was wasteful. Review full conversa
 
 ## Running Bundled Scripts
 
-Skills that include Python scripts should guide agents to validate the environment before running:
+### Prefer shell scripts over Python
 
-1. **Check Python version** — all skillproof scripts require Python 3.10+ (union type syntax). Before running scripts, verify: `python3 --version`
-2. **Prefer local .venv** — if the project has a `.venv/` directory, activate it first: `source .venv/bin/activate`. This ensures consistent Python version and any needed dependencies.
-3. **Document dependencies** — list external packages (e.g., `anthropic`) in the `__init__.py` prerequisites section so agents know what to install.
+Write bundled scripts in **bash** (shell) by default. Node.js is guaranteed by Claude Code, so use `node -e` for JSON parsing, arithmetic, and any logic that bash can't handle cleanly. This eliminates Python version requirements and virtual environment setup for users.
+
+**Use shell when:**
+- Running `claude -p` and capturing output
+- Parsing JSON from timing files or API responses
+- Computing deltas, aggregations, or formatting tables
+- Orchestrating multi-step test flows (RED-GREEN cycles, pressure tests)
+
+**Use Python only when:**
+- Complex data structures require classes/dataclasses (e.g., `RunResult`)
+- Advanced analysis that would be unwieldy in shell (e.g., statistical aggregation, multi-file diagnosis)
+- External SDK dependencies are required (e.g., `anthropic` for description optimization)
+
+When a skill ships both `.sh` and `.py` versions, document the shell version as the primary entry point.
+
+### Shell script conventions
+
+- Shebang: `#!/usr/bin/env bash`
+- Always `set -euo pipefail`
+- Use `node -e` for JSON parsing (never `jq` — it's not guaranteed)
+- Pass JSON strings as `process.argv[1]` to node, not via stdin or string interpolation
+- Use `$SKILLPROOF_ROOT` and `$SKILLPROOF_WORKSPACE` environment variables
+
+```bash
+# JSON parsing pattern — use this, not jq
+json_get() {
+    local json="$1" path="$2" default="${3:-}"
+    local val
+    val=$(node -e "
+        const d = JSON.parse(process.argv[1]);
+        const keys = process.argv[2].split('.');
+        let v = d;
+        for (const k of keys) { if (v == null) break; v = v[k]; }
+        process.stdout.write(v == null ? '' : String(v));
+    " "$json" "$path" 2>/dev/null) || true
+    echo "${val:-$default}"
+}
+```
+
+### Python scripts (when needed)
+
+If a skill includes Python scripts:
+
+1. **Check Python version** — skillproof Python scripts require Python 3.10+ (union type syntax). Verify: `python3 --version`
+2. **Prefer local .venv** — if the project has a `.venv/` directory, activate it first: `source .venv/bin/activate`
+3. **Document dependencies** — list external packages (e.g., `anthropic`) in the `__init__.py` prerequisites section
 
 Add a **Prerequisites** line to SKILL.md "Bundled Scripts" sections:
 
 ```markdown
-**Prerequisites:** Python 3.10+, `claude` CLI. Activate `.venv` if available.
+**Prerequisites:** `claude` CLI. Shell scripts use node for JSON (guaranteed by Claude Code). Python 3.10+ only needed for analysis scripts.
 ```
 
 ## Quick Checklist
@@ -256,4 +299,6 @@ Before shipping a skill:
 - [ ] One excellent example per key pattern
 - [ ] No dead-weight instructions (every line changes behavior)
 - [ ] Tested by reading the full transcript, not just the output
-- [ ] Scripts document Python version and dependencies in `__init__.py`
+- [ ] Bundled scripts are shell by default (Python only for complex analysis)
+- [ ] Shell scripts use `node -e` for JSON parsing (not jq)
+- [ ] Python scripts (if any) document version and dependencies in `__init__.py`

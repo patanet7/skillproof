@@ -39,13 +39,14 @@ Output structure:
 
 import argparse
 import json
-import os
 import re
-import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Add _shared to import path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "_shared"))
+from claude_runner import run_claude as _run_claude, save_timing  # noqa: E402
 
 
 def extract_choice(text: str) -> str | None:
@@ -125,50 +126,28 @@ def run_single(
     model: str | None = None,
 ) -> dict:
     """Run a single pressure test via `claude -p`."""
-    cmd = ["claude", "-p", prompt, "--output-format", "json"]
-    cmd.extend(["--allowedTools", "Read", "Glob", "Grep"])
-    if model:
-        cmd.extend(["--model", model])
-    if skill_path:
-        cmd.extend(["--skill-path", str(skill_path)])
+    result = _run_claude(
+        prompt=prompt,
+        skill_path=skill_path,
+        timeout=timeout,
+        model=model,
+    )
 
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-    start = time.monotonic()
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-        )
-        duration = time.monotonic() - start
-    except subprocess.TimeoutExpired:
-        return {
-            "response": f"[TIMEOUT after {timeout}s]",
-            "choice": None,
-            "rationalizations": [],
-            "duration_seconds": timeout,
-            "exit_code": -1,
-        }
-
-    response_text = result.stdout
-    try:
-        parsed = json.loads(response_text)
-        response_text = parsed.get("result", response_text)
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    choice = extract_choice(response_text)
-    rationalizations = extract_rationalizations(response_text)
+    choice = extract_choice(result.response)
+    rationalizations = extract_rationalizations(result.response)
 
     return {
-        "response": response_text,
+        "response": result.response,
         "choice": choice,
         "rationalizations": rationalizations,
-        "duration_seconds": round(duration - start + start, 2),
-        "exit_code": result.returncode,
+        "duration_seconds": result.total_duration_seconds,
+        "exit_code": result.exit_code,
+        "total_tokens": result.total_tokens,
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+        "cost_usd": result.cost_usd,
+        "num_turns": result.num_turns,
+        "_run_result": result,
     }
 
 
@@ -233,9 +212,11 @@ def run_pressure_test(
                     model=model,
                 )
 
-                # Save full response
+                # Save full response and timing
+                run_result = result.pop("_run_result")
                 (run_dir / "response.json").write_text(json.dumps(result, indent=2))
                 (run_dir / "response.txt").write_text(result["response"])
+                save_timing(run_result, run_dir / "timing.json")
 
                 choice_str = result["choice"] or "NONE"
                 compliant = (
@@ -244,7 +225,9 @@ def run_pressure_test(
                 print(
                     f"    Run {run_idx}: Choice={choice_str} "
                     f"({'PASS' if compliant else 'FAIL' if compliant is not None else '?'}) "
-                    f"[{result['duration_seconds']:.1f}s]"
+                    f"[{result['duration_seconds']:.1f}s, "
+                    f"{result['total_tokens']:,} tokens, "
+                    f"${result['cost_usd']:.4f}]"
                 )
 
                 all_results.append(
@@ -256,6 +239,8 @@ def run_pressure_test(
                         "rationalizations": result["rationalizations"],
                         "compliant": compliant,
                         "duration_seconds": result["duration_seconds"],
+                        "total_tokens": result["total_tokens"],
+                        "cost_usd": result["cost_usd"],
                     }
                 )
 

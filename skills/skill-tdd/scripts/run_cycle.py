@@ -20,70 +20,13 @@ for discipline skills, or a task prompt for workflow skills).
 
 import argparse
 import json
-import os
-import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-
-def run_claude(
-    prompt: str,
-    skill_path: Path | None,
-    timeout: int,
-    model: str | None = None,
-) -> dict:
-    """Run a prompt through `claude -p` and capture the response.
-
-    Args:
-        prompt: The scenario prompt to send.
-        skill_path: Path to skill directory (None for baseline).
-        timeout: Timeout in seconds.
-        model: Optional model override.
-
-    Returns:
-        dict with keys: response, duration_seconds, exit_code
-    """
-    cmd = ["claude", "-p", prompt, "--output-format", "json"]
-    cmd.extend(["--allowedTools", "Read", "Glob", "Grep"])
-    if model:
-        cmd.extend(["--model", model])
-    if skill_path:
-        cmd.extend(["--skill-path", str(skill_path)])
-
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
-
-    start = time.monotonic()
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env=env,
-        )
-        duration = time.monotonic() - start
-    except subprocess.TimeoutExpired:
-        return {
-            "response": f"[TIMEOUT after {timeout}s]",
-            "duration_seconds": timeout,
-            "exit_code": -1,
-        }
-
-    # Try to parse JSON output from claude -p
-    response_text = result.stdout
-    try:
-        parsed = json.loads(response_text)
-        response_text = parsed.get("result", response_text)
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    return {
-        "response": response_text,
-        "duration_seconds": round(duration, 2),
-        "exit_code": result.returncode,
-    }
+# Add _shared to import path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "_shared"))
+from claude_runner import run_claude, save_timing  # noqa: E402
 
 
 def run_cycle(
@@ -119,24 +62,19 @@ def run_cycle(
     (cycle_dir / "cycle_metadata.json").write_text(json.dumps(metadata, indent=2))
 
     # Phase 1: RED — Baseline (no skill)
-    print(f"RED phase: Running baseline (no skill)...")
+    print("RED phase: Running baseline (no skill)...")
     baseline_result = run_claude(
         prompt=scenario_prompt,
         skill_path=None,
         timeout=timeout,
         model=model,
     )
-    (baseline_dir / "response.txt").write_text(baseline_result["response"])
-    (baseline_dir / "timing.json").write_text(
-        json.dumps(
-            {
-                "duration_seconds": baseline_result["duration_seconds"],
-                "exit_code": baseline_result["exit_code"],
-            },
-            indent=2,
-        )
+    (baseline_dir / "response.txt").write_text(baseline_result.response)
+    save_timing(baseline_result, baseline_dir / "timing.json")
+    print(
+        f"  Baseline complete ({baseline_result.total_duration_seconds:.1f}s, "
+        f"{baseline_result.total_tokens:,} tokens, ${baseline_result.cost_usd:.4f})"
     )
-    print(f"  Baseline complete ({baseline_result['duration_seconds']:.1f}s)")
 
     # Phase 2: GREEN — With skill
     print(f"GREEN phase: Running with skill '{skill_name}'...")
@@ -146,35 +84,74 @@ def run_cycle(
         timeout=timeout,
         model=model,
     )
-    (with_skill_dir / "response.txt").write_text(skill_result["response"])
-    (with_skill_dir / "timing.json").write_text(
-        json.dumps(
-            {
-                "duration_seconds": skill_result["duration_seconds"],
-                "exit_code": skill_result["exit_code"],
-            },
-            indent=2,
-        )
+    (with_skill_dir / "response.txt").write_text(skill_result.response)
+    save_timing(skill_result, with_skill_dir / "timing.json")
+    print(
+        f"  With-skill complete ({skill_result.total_duration_seconds:.1f}s, "
+        f"{skill_result.total_tokens:,} tokens, ${skill_result.cost_usd:.4f})"
     )
-    print(f"  With-skill complete ({skill_result['duration_seconds']:.1f}s)")
 
-    # Write summary
+    # Write summary with full metrics
     summary = {
         "baseline": {
-            "response_length": len(baseline_result["response"]),
-            "duration_seconds": baseline_result["duration_seconds"],
+            "response_length": len(baseline_result.response),
+            "duration_seconds": baseline_result.total_duration_seconds,
+            "total_tokens": baseline_result.total_tokens,
+            "input_tokens": baseline_result.input_tokens,
+            "output_tokens": baseline_result.output_tokens,
+            "cost_usd": baseline_result.cost_usd,
+            "num_turns": baseline_result.num_turns,
         },
         "with_skill": {
-            "response_length": len(skill_result["response"]),
-            "duration_seconds": skill_result["duration_seconds"],
+            "response_length": len(skill_result.response),
+            "duration_seconds": skill_result.total_duration_seconds,
+            "total_tokens": skill_result.total_tokens,
+            "input_tokens": skill_result.input_tokens,
+            "output_tokens": skill_result.output_tokens,
+            "cost_usd": skill_result.cost_usd,
+            "num_turns": skill_result.num_turns,
+        },
+        "delta": {
+            "tokens": skill_result.total_tokens - baseline_result.total_tokens,
+            "cost_usd": round(skill_result.cost_usd - baseline_result.cost_usd, 6),
+            "duration_seconds": round(
+                skill_result.total_duration_seconds - baseline_result.total_duration_seconds, 2
+            ),
         },
     }
     (cycle_dir / "summary.json").write_text(json.dumps(summary, indent=2))
 
+    # Print comparison table
+    print(f"\n{'='*60}")
+    print(f"  TDD Cycle Results: {skill_name}")
+    print(f"{'='*60}")
+    print(f"  {'Metric':<20} {'Baseline':>12} {'With Skill':>12} {'Delta':>12}")
+    print(f"  {'-'*20} {'-'*12} {'-'*12} {'-'*12}")
+    print(
+        f"  {'Tokens':<20} {baseline_result.total_tokens:>12,} "
+        f"{skill_result.total_tokens:>12,} "
+        f"{summary['delta']['tokens']:>+12,}"
+    )
+    delta_cost = summary["delta"]["cost_usd"]
+    print(
+        f"  {'Cost':<20} {'$' + f'{baseline_result.cost_usd:.4f}':>12} "
+        f"{'$' + f'{skill_result.cost_usd:.4f}':>12} "
+        f"{'$' + f'{delta_cost:.4f}':>12}"
+    )
+    print(
+        f"  {'Duration':<20} {baseline_result.total_duration_seconds:>11.1f}s "
+        f"{skill_result.total_duration_seconds:>11.1f}s "
+        f"{summary['delta']['duration_seconds']:>+11.1f}s"
+    )
+    print(
+        f"  {'Turns':<20} {baseline_result.num_turns:>12} "
+        f"{skill_result.num_turns:>12} "
+        f"{skill_result.num_turns - baseline_result.num_turns:>+12}"
+    )
+    print(f"{'='*60}")
     print(f"\nResults saved to: {cycle_dir}")
     print(f"  baseline/response.txt   — agent without skill")
     print(f"  with_skill/response.txt — agent with skill")
-    print(f"\nCompare outputs to evaluate the skill's effect.")
 
     return cycle_dir
 

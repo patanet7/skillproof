@@ -3,7 +3,7 @@ name: skill-compare
 description: Use when comparing two skills head-to-head on the same tasks to determine
   which produces better results — for choosing between skill versions, competing
   approaches, or validating that a rewrite improves on the original
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash(cd *), Bash(bash *), Bash(python *), Bash(mkdir *), Read(/tmp/skillproof/**), Write(/tmp/skillproof/**), Edit(/tmp/skillproof/**)
 ---
 
 # Comparing Skills Head-to-Head
@@ -66,14 +66,16 @@ Key: prompts must be fair to both skills. Don't write prompts that favor one app
 ## Step 3: Initialize Workspace
 
 ```bash
-cd <plugin-root>/skills/skill-compare
+cd $SKILLPROOF_ROOT/skills/skill-compare
 python -m scripts.init_matchup \
     --skill-a /path/to/skill-a \
     --skill-b /path/to/skill-b \
     --evals evals.json \
-    --output ./matchup-workspace \
+    --output /tmp/skillproof/<matchup-name> \
     --runs 3
 ```
+
+**Important:** Always use `/tmp/skillproof/` (or another path outside the project repo) for workspace output. The SessionStart hook creates this directory automatically.
 
 This creates the workspace with `matchup.json`, eval directories, and `run-N/outputs/` per eval per config per run.
 
@@ -89,7 +91,7 @@ Both skills execute against every eval prompt in parallel via `claude -p`. Outpu
 
 ## Step 5: Grade Outputs
 
-Spawn a grader subagent for EACH run directory using `../writing-skills/agents/grader.md`:
+Spawn a grader subagent for EACH run directory using `grader.md`:
 
 ```
 Grade this run:
@@ -105,7 +107,7 @@ The grader evaluates each assertion as PASS/FAIL with evidence, extracts implici
 Run the shared benchmark aggregator from writing-skills:
 
 ```bash
-cd <plugin-root>/skills/writing-skills
+cd $SKILLPROOF_ROOT/skills/writing-skills
 python -m scripts.aggregate_benchmark \
     <workspace>/iteration-1 \
     --skill-name "matchup-name"
@@ -115,7 +117,7 @@ Produces `benchmark.json` and `benchmark.md` with pass_rate, time, and tokens pe
 
 ## Step 7: Blind Comparison
 
-For each eval, spawn a comparator subagent using `../writing-skills/agents/comparator.md`.
+For each eval, spawn a comparator subagent using `comparator.md`.
 
 **Randomize A/B assignment per eval to prevent position bias:**
 - Eval 1: A = skill-a, B = skill-b
@@ -145,7 +147,7 @@ After saving `comparison.json`, add a `_label_map` field recording which config 
 
 ## Step 8: Analyze (Optional)
 
-For deeper insights, spawn an analyzer subagent using `../writing-skills/agents/analyzer.md`:
+For deeper insights, spawn an analyzer subagent using `analyzer.md`:
 
 ```
 Analyze comparison results:
@@ -162,7 +164,7 @@ This is optional — most useful when results are close and you want to understa
 **Launch the eval viewer** for visual review:
 
 ```bash
-cd <plugin-root>/skills/writing-skills
+cd $SKILLPROOF_ROOT/skills/writing-skills
 nohup python eval-viewer/generate_review.py \
     <workspace>/iteration-1 \
     --skill-name "matchup-name" \
@@ -173,7 +175,7 @@ nohup python eval-viewer/generate_review.py \
 **Generate the matchup report:**
 
 ```bash
-cd <plugin-root>/skills/skill-compare
+cd $SKILLPROOF_ROOT/skills/skill-compare
 python -m scripts.summarize_matchup \
     --workspace ./matchup-workspace/iteration-1
 ```
@@ -217,7 +219,7 @@ This layout is compatible with `aggregate_benchmark.py` (discovers configs dynam
 Run from the skill-compare directory within the plugin:
 
 ```bash
-cd <plugin-root>/skills/skill-compare
+cd $SKILLPROOF_ROOT/skills/skill-compare
 ```
 
 | Script | Purpose | When to use |
@@ -229,7 +231,7 @@ cd <plugin-root>/skills/skill-compare
 For grading, benchmarking, and viewing, use the shared `writing-skills` scripts:
 
 ```bash
-cd <plugin-root>/skills/writing-skills
+cd $SKILLPROOF_ROOT/skills/writing-skills
 python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>
 python eval-viewer/generate_review.py <workspace>/iteration-N --skill-name <name>
 ```

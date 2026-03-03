@@ -1,7 +1,7 @@
 ---
 name: skill-tdd
 description: Use when creating, editing, or validating a SKILL.md before deployment using a test-first cycle — covers new skill authorship, updates to existing skills, and pre-deployment validation of any skill artifact
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash(cd *), Bash(bash *), Bash(python *), Bash(mkdir *), Read(/tmp/skillproof/**), Write(/tmp/skillproof/**), Edit(/tmp/skillproof/**)
 ---
 
 # Test-Driven Skill Development
@@ -235,16 +235,26 @@ it crystal clear that Option A was the only acceptable answer?
 Run from the skill-tdd directory within the plugin:
 
 ```bash
-cd <plugin-root>/skills/skill-tdd
+cd $SKILLPROOF_ROOT/skills/skill-tdd
 ```
+
+### Shell scripts (preferred — no Python required)
+
+| Script | Purpose | When to use |
+|--------|---------|-------------|
+| `bash scripts/run_cycle.sh --skill-path <path> --scenario <file>` | Run RED-GREEN cycle (baseline vs with-skill) | Testing a skill's effect |
+
+Shell scripts use `node` for JSON parsing (guaranteed by Claude Code). No jq or Python needed.
+
+### Python scripts (for advanced features)
 
 | Script | Purpose | When to use |
 |--------|---------|-------------|
 | `python -m scripts.scaffold_skill <name> -o <path>` | Create new skill directory with SKILL.md template | Starting a new skill |
 | `python -m scripts.scaffold_skill <name> -t discipline` | Scaffold with discipline-specific sections | Creating a discipline skill |
-| `python -m scripts.run_cycle --skill-path <path> --scenario <file>` | Run RED-GREEN cycle (baseline vs with-skill) | Testing a skill's effect |
+| `python -m scripts.run_cycle --skill-path <path> --scenario <file>` | Run RED-GREEN cycle with full Python metrics | When Python 3.10+ is available |
 
-**Prerequisites:** Python 3.10+, `claude` CLI. Activate `.venv` if available.
+**Prerequisites:** `claude` CLI. Shell scripts work out of the box. Python 3.10+ only needed for scaffold and Python-based cycle runner.
 
 ## Testing Checklist
 

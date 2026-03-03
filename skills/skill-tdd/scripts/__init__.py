@@ -1,7 +1,7 @@
 """Skill-TDD development scripts.
 
 Invoke from the skill-tdd directory within the plugin:
-    cd <plugin-root>/skills/skill-tdd
+    cd $SKILLPROOF_ROOT/skills/skill-tdd
     python -m scripts.scaffold_skill <skill-name> --output <path>
     python -m scripts.run_cycle --skill-path <path> --scenario <file> [--model <model-id>]
 

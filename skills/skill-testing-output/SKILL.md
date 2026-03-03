@@ -1,7 +1,7 @@
 ---
 name: skill-testing-output
 description: Use when evaluating whether a skill measurably improves outputs by running controlled comparisons — with-skill vs without-skill, old version vs new version, or A/B tests across skill variants — where quality is graded on produced artifacts like code, docs, migrations, or commit messages
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash(cd *), Bash(bash *), Bash(python *), Bash(mkdir *), Read(/tmp/skillproof/**), Write(/tmp/skillproof/**), Edit(/tmp/skillproof/**)
 ---
 
 # Testing Output-Quality Skills
@@ -54,7 +54,7 @@ Save test cases to `evals/evals.json`:
 
 Don't write assertions yet — just prompts. You'll draft assertions while runs are in progress.
 
-See `../writing-skills/references/schemas.md` for the full schema.
+See `schemas.md` for the full schema.
 
 ## Running Tests
 
@@ -115,7 +115,7 @@ This is the only opportunity to capture this data — it comes through the notif
 
 ## Grading
 
-Spawn a grader subagent using `../writing-skills/agents/grader.md`:
+Spawn a grader subagent using `grader.md`:
 - Reads the execution transcript and output files
 - Evaluates each assertion: PASS or FAIL with evidence
 - Extracts and verifies implicit claims from outputs
@@ -135,14 +135,14 @@ python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name
 
 Produces `benchmark.json` and `benchmark.md` with pass_rate, time, and tokens for each configuration, with mean ± stddev and delta.
 
-See `../writing-skills/references/schemas.md` for the benchmark.json format.
+See `schemas.md` for the benchmark.json format.
 
 ## Viewing Results
 
 Launch the browser-based reviewer:
 
 ```bash
-nohup python ../writing-skills/eval-viewer/generate_review.py \
+nohup python $SKILLPROOF_ROOT/skills/writing-skills/eval-viewer/generate_review.py \
   <workspace>/iteration-N \
   --skill-name "my-skill" \
   --benchmark <workspace>/iteration-N/benchmark.json \
@@ -213,8 +213,8 @@ Keep going until:
 
 For rigorous comparison between two skill versions:
 
-1. Use `../writing-skills/agents/comparator.md` — give two outputs labeled A/B without revealing which skill produced which
-2. Use `../writing-skills/agents/analyzer.md` — analyze WHY the winner won
+1. Use `comparator.md` — give two outputs labeled A/B without revealing which skill produced which
+2. Use `analyzer.md` — analyze WHY the winner won
 
 Optional, requires subagents, most users don't need it. The human review loop is usually sufficient.
 
@@ -250,7 +250,7 @@ skill-name-workspace/
 Run from the skill-testing-output directory within the plugin:
 
 ```bash
-cd <plugin-root>/skills/skill-testing-output
+cd $SKILLPROOF_ROOT/skills/skill-testing-output
 ```
 
 | Script | Purpose | When to use |
@@ -263,7 +263,7 @@ cd <plugin-root>/skills/skill-testing-output
 For grading and benchmarking, use the shared `writing-skills` scripts:
 
 ```bash
-cd <plugin-root>/skills/writing-skills
+cd $SKILLPROOF_ROOT/skills/writing-skills
 python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>
 ```
 

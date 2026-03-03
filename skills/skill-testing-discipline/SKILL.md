@@ -1,7 +1,7 @@
 ---
 name: skill-testing-discipline
 description: Use when testing skills that enforce rules, require compliance, or have discipline requirements that agents might rationalize away under pressure
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash(cd *), Bash(bash *), Bash(python *), Bash(mkdir *), Read(/tmp/skillproof/**), Write(/tmp/skillproof/**), Edit(/tmp/skillproof/**)
 ---
 
 # Testing Discipline Skills
@@ -282,7 +282,7 @@ Meta-test: "The skill was clear, I should follow it"
 Run scripts from the skill-testing-discipline directory within the plugin:
 
 ```bash
-cd <plugin-root>/skills/skill-testing-discipline
+cd $SKILLPROOF_ROOT/skills/skill-testing-discipline
 ```
 
 | Resource | Purpose | When to use |

@@ -221,6 +221,95 @@ def extract_feedback(workspace: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Permission denial extraction
+# ---------------------------------------------------------------------------
+
+def extract_permission_denials(workspace: Path) -> list[dict]:
+    """Extract permission denials from timing.json files across all runs.
+
+    Permission denials indicate tools the agent tried to use but couldn't,
+    which directly informs what allowed-tools entries the skill needs.
+    """
+    denials_by_tool: dict[str, dict] = {}
+
+    for timing_path in workspace.rglob("timing.json"):
+        try:
+            data = json.loads(timing_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        for denial in data.get("permission_denials", []):
+            tool_name = denial.get("tool_name", "unknown")
+            if tool_name not in denials_by_tool:
+                denials_by_tool[tool_name] = {
+                    "tool_name": tool_name,
+                    "count": 0,
+                    "examples": [],
+                }
+            denials_by_tool[tool_name]["count"] += 1
+            # Keep a few examples of what the agent tried
+            if len(denials_by_tool[tool_name]["examples"]) < 3:
+                example = {
+                    "tool_input": denial.get("tool_input", {}),
+                    "source": str(timing_path.relative_to(workspace)),
+                }
+                denials_by_tool[tool_name]["examples"].append(example)
+
+    return sorted(denials_by_tool.values(), key=lambda d: d["count"], reverse=True)
+
+
+# ---------------------------------------------------------------------------
+# Token/cost extraction
+# ---------------------------------------------------------------------------
+
+def extract_token_summary(workspace: Path) -> dict:
+    """Extract token and cost totals from timing.json files for summary reporting."""
+    totals: dict[str, dict] = {}
+
+    for eval_dir in sorted(workspace.iterdir()):
+        if not (eval_dir.is_dir() and eval_dir.name.startswith("eval-")):
+            continue
+
+        for config_dir in sorted(eval_dir.iterdir()):
+            if not config_dir.is_dir():
+                continue
+
+            config_name = config_dir.name
+            if config_name not in totals:
+                totals[config_name] = {
+                    "total_tokens": [],
+                    "cost_usd": [],
+                    "num_turns": [],
+                }
+
+            # Scan timing.json in config dir or run-N/ subdirs
+            for timing_path in config_dir.rglob("timing.json"):
+                try:
+                    data = json.loads(timing_path.read_text())
+                except (json.JSONDecodeError, OSError):
+                    continue
+                if data.get("total_tokens"):
+                    totals[config_name]["total_tokens"].append(data["total_tokens"])
+                if data.get("cost_usd"):
+                    totals[config_name]["cost_usd"].append(data["cost_usd"])
+                if data.get("num_turns"):
+                    totals[config_name]["num_turns"].append(data["num_turns"])
+
+    # Compute averages
+    summary = {}
+    for config, metrics in totals.items():
+        summary[config] = {}
+        for metric, values in metrics.items():
+            if values:
+                summary[config][metric] = {
+                    "mean": round(sum(values) / len(values), 2),
+                    "total": round(sum(values), 2),
+                    "count": len(values),
+                }
+    return summary
+
+
+# ---------------------------------------------------------------------------
 # Benchmark extraction
 # ---------------------------------------------------------------------------
 
@@ -260,6 +349,8 @@ def diagnose_workspace(workspace: Path) -> dict:
     comparison_losses = extract_comparison_losses(evals)
     complaints = extract_feedback(workspace)
     benchmark_summary = extract_benchmark(workspace)
+    permission_denials = extract_permission_denials(workspace)
+    token_summary = extract_token_summary(workspace)
 
     return {
         "workspace_path": str(workspace),
@@ -270,6 +361,8 @@ def diagnose_workspace(workspace: Path) -> dict:
         "inconsistent_assertions": inconsistent,
         "user_complaints": complaints,
         "comparison_losses": comparison_losses,
+        "permission_denials": permission_denials,
+        "token_summary": token_summary,
         "benchmark_summary": benchmark_summary,
     }
 
@@ -299,6 +392,31 @@ def main() -> None:
     print(f"  Inconsistent assertions: {len(report['inconsistent_assertions'])}")
     print(f"  User complaints: {len(report['user_complaints'])}")
     print(f"  Comparison losses: {len(report['comparison_losses'])}")
+
+    # Permission denials — actionable for allowed-tools
+    denials = report.get("permission_denials", [])
+    if denials:
+        print(f"\n  Permission denials ({sum(d['count'] for d in denials)} total):")
+        for d in denials:
+            print(f"    {d['tool_name']}: {d['count']}x")
+            for ex in d["examples"]:
+                tool_input = ex.get("tool_input", {})
+                if isinstance(tool_input, dict) and "command" in tool_input:
+                    print(f"      e.g. {tool_input['command'][:80]}")
+        print("    -> Consider adding these to allowed-tools in SKILL.md frontmatter")
+
+    # Token summary
+    token_summary = report.get("token_summary", {})
+    if token_summary:
+        print(f"\n  Token usage by config:")
+        for config, metrics in token_summary.items():
+            tokens = metrics.get("total_tokens", {})
+            cost = metrics.get("cost_usd", {})
+            print(
+                f"    {config}: "
+                f"{tokens.get('mean', 0):,.0f} tokens/run avg, "
+                f"${cost.get('total', 0):.4f} total cost"
+            )
 
 
 if __name__ == "__main__":

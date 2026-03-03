@@ -137,19 +137,30 @@ def load_run_results(benchmark_dir: Path) -> dict:
                 timing = grading.get("timing", {})
                 result["time_seconds"] = timing.get("total_duration_seconds", 0.0)
                 timing_file = run_dir / "timing.json"
-                if result["time_seconds"] == 0.0 and timing_file.exists():
+                timing_data = {}
+                if timing_file.exists():
                     try:
                         with open(timing_file) as tf:
                             timing_data = json.load(tf)
-                        result["time_seconds"] = timing_data.get("total_duration_seconds", 0.0)
-                        result["tokens"] = timing_data.get("total_tokens", 0)
                     except json.JSONDecodeError:
                         pass
+
+                if result["time_seconds"] == 0.0:
+                    result["time_seconds"] = timing_data.get("total_duration_seconds", 0.0)
+
+                # Token data from timing.json (populated by claude_runner)
+                result["tokens"] = timing_data.get("total_tokens", 0)
+                result["input_tokens"] = timing_data.get("input_tokens", 0)
+                result["output_tokens"] = timing_data.get("output_tokens", 0)
+                result["cost_usd"] = timing_data.get("cost_usd", 0.0)
+                result["num_turns"] = timing_data.get("num_turns", 0)
+                result["duration_api_ms"] = timing_data.get("duration_api_ms", 0)
+                result["permission_denials"] = len(timing_data.get("permission_denials", []))
 
                 # Extract metrics if available
                 metrics = grading.get("execution_metrics", {})
                 result["tool_calls"] = metrics.get("total_tool_calls", 0)
-                if not result.get("tokens"):
+                if not result["tokens"]:
                     result["tokens"] = metrics.get("output_chars", 0)
                 result["errors"] = metrics.get("errors_encountered", 0)
 
@@ -182,25 +193,39 @@ def aggregate_results(results: dict) -> dict:
     run_summary = {}
     configs = list(results.keys())
 
+    empty_stats = {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0}
+
     for config in configs:
         runs = results.get(config, [])
 
         if not runs:
             run_summary[config] = {
-                "pass_rate": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
-                "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
-                "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+                "pass_rate": dict(empty_stats),
+                "time_seconds": dict(empty_stats),
+                "tokens": dict(empty_stats),
+                "input_tokens": dict(empty_stats),
+                "output_tokens": dict(empty_stats),
+                "cost_usd": dict(empty_stats),
+                "num_turns": dict(empty_stats),
             }
             continue
 
         pass_rates = [r["pass_rate"] for r in runs]
         times = [r["time_seconds"] for r in runs]
         tokens = [r.get("tokens", 0) for r in runs]
+        input_tokens = [r.get("input_tokens", 0) for r in runs]
+        output_tokens = [r.get("output_tokens", 0) for r in runs]
+        costs = [r.get("cost_usd", 0.0) for r in runs]
+        turns = [r.get("num_turns", 0) for r in runs]
 
         run_summary[config] = {
             "pass_rate": calculate_stats(pass_rates),
             "time_seconds": calculate_stats(times),
-            "tokens": calculate_stats(tokens)
+            "tokens": calculate_stats(tokens),
+            "input_tokens": calculate_stats(input_tokens),
+            "output_tokens": calculate_stats(output_tokens),
+            "cost_usd": calculate_stats(costs),
+            "num_turns": calculate_stats(turns),
         }
 
     # Calculate delta between the first two configs (if two exist)
@@ -211,14 +236,17 @@ def aggregate_results(results: dict) -> dict:
         primary = run_summary.get(configs[0], {}) if configs else {}
         baseline = {}
 
-    delta_pass_rate = primary.get("pass_rate", {}).get("mean", 0) - baseline.get("pass_rate", {}).get("mean", 0)
-    delta_time = primary.get("time_seconds", {}).get("mean", 0) - baseline.get("time_seconds", {}).get("mean", 0)
-    delta_tokens = primary.get("tokens", {}).get("mean", 0) - baseline.get("tokens", {}).get("mean", 0)
+    def _delta(metric: str) -> float:
+        return primary.get(metric, {}).get("mean", 0) - baseline.get(metric, {}).get("mean", 0)
 
     run_summary["delta"] = {
-        "pass_rate": f"{delta_pass_rate:+.2f}",
-        "time_seconds": f"{delta_time:+.1f}",
-        "tokens": f"{delta_tokens:+.0f}"
+        "pass_rate": f"{_delta('pass_rate'):+.2f}",
+        "time_seconds": f"{_delta('time_seconds'):+.1f}",
+        "tokens": f"{_delta('tokens'):+.0f}",
+        "input_tokens": f"{_delta('input_tokens'):+.0f}",
+        "output_tokens": f"{_delta('output_tokens'):+.0f}",
+        "cost_usd": f"{_delta('cost_usd'):+.6f}",
+        "num_turns": f"{_delta('num_turns'):+.1f}",
     }
 
     return run_summary
@@ -246,8 +274,13 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
                     "total": result["total"],
                     "time_seconds": result["time_seconds"],
                     "tokens": result.get("tokens", 0),
+                    "input_tokens": result.get("input_tokens", 0),
+                    "output_tokens": result.get("output_tokens", 0),
+                    "cost_usd": result.get("cost_usd", 0.0),
+                    "num_turns": result.get("num_turns", 0),
                     "tool_calls": result.get("tool_calls", 0),
-                    "errors": result.get("errors", 0)
+                    "errors": result.get("errors", 0),
+                    "permission_denials": result.get("permission_denials", 0),
                 },
                 "expectations": result["expectations"],
                 "notes": result["notes"]
@@ -307,20 +340,29 @@ def generate_markdown(benchmark: dict) -> str:
     b_summary = run_summary.get(config_b, {})
     delta = run_summary.get("delta", {})
 
-    # Format pass rate
+    def _row(label, metric, fmt=",.0f", suffix=""):
+        a = a_summary.get(metric, {})
+        b = b_summary.get(metric, {})
+        d = delta.get(metric, "—")
+        a_val = f"{a.get('mean', 0):{fmt}}{suffix} ± {a.get('stddev', 0):{fmt}}{suffix}"
+        b_val = f"{b.get('mean', 0):{fmt}}{suffix} ± {b.get('stddev', 0):{fmt}}{suffix}"
+        return f"| {label} | {a_val} | {b_val} | {d}{suffix} |"
+
+    # Pass rate (special formatting — percentage)
     a_pr = a_summary.get("pass_rate", {})
     b_pr = b_summary.get("pass_rate", {})
-    lines.append(f"| Pass Rate | {a_pr.get('mean', 0)*100:.0f}% ± {a_pr.get('stddev', 0)*100:.0f}% | {b_pr.get('mean', 0)*100:.0f}% ± {b_pr.get('stddev', 0)*100:.0f}% | {delta.get('pass_rate', '—')} |")
+    lines.append(
+        f"| Pass Rate | {a_pr.get('mean', 0)*100:.0f}% ± {a_pr.get('stddev', 0)*100:.0f}% "
+        f"| {b_pr.get('mean', 0)*100:.0f}% ± {b_pr.get('stddev', 0)*100:.0f}% "
+        f"| {delta.get('pass_rate', '—')} |"
+    )
 
-    # Format time
-    a_time = a_summary.get("time_seconds", {})
-    b_time = b_summary.get("time_seconds", {})
-    lines.append(f"| Time | {a_time.get('mean', 0):.1f}s ± {a_time.get('stddev', 0):.1f}s | {b_time.get('mean', 0):.1f}s ± {b_time.get('stddev', 0):.1f}s | {delta.get('time_seconds', '—')}s |")
-
-    # Format tokens
-    a_tokens = a_summary.get("tokens", {})
-    b_tokens = b_summary.get("tokens", {})
-    lines.append(f"| Tokens | {a_tokens.get('mean', 0):.0f} ± {a_tokens.get('stddev', 0):.0f} | {b_tokens.get('mean', 0):.0f} ± {b_tokens.get('stddev', 0):.0f} | {delta.get('tokens', '—')} |")
+    lines.append(_row("Total Tokens", "tokens"))
+    lines.append(_row("Input Tokens", "input_tokens"))
+    lines.append(_row("Output Tokens", "output_tokens"))
+    lines.append(_row("Cost", "cost_usd", fmt=".4f", suffix=""))
+    lines.append(_row("Time", "time_seconds", fmt=".1f", suffix="s"))
+    lines.append(_row("Turns", "num_turns", fmt=".1f"))
 
     # Notes section
     if benchmark.get("notes"):
@@ -384,17 +426,42 @@ def main():
         f.write(markdown)
     print(f"Generated: {output_md}")
 
-    # Print summary
+    # Print summary table
     run_summary = benchmark["run_summary"]
     configs = [k for k in run_summary if k != "delta"]
     delta = run_summary.get("delta", {})
 
-    print(f"\nSummary:")
-    for config in configs:
-        pr = run_summary[config]["pass_rate"]["mean"]
-        label = config.replace("_", " ").title()
-        print(f"  {label}: {pr*100:.1f}% pass rate")
-    print(f"  Delta:         {delta.get('pass_rate', '—')}")
+    labels = [c.replace("_", " ").title() for c in configs]
+    label_a = labels[0] if labels else "Config A"
+    label_b = labels[1] if len(labels) > 1 else "Config B"
+
+    print(f"\n{'='*70}")
+    print(f"  Benchmark Summary: {args.skill_name or 'skill'}")
+    print(f"{'='*70}")
+    print(f"  {'Metric':<18} {label_a:>16} {label_b:>16} {'Delta':>14}")
+    print(f"  {'-'*18} {'-'*16} {'-'*16} {'-'*14}")
+
+    for config_key, label in zip(configs, labels):
+        _ = label  # used above
+
+    def _print_row(metric_label, key, fmt=".0f", suffix=""):
+        a_val = run_summary.get(configs[0], {}).get(key, {}).get("mean", 0) if configs else 0
+        b_val = run_summary.get(configs[1], {}).get(key, {}).get("mean", 0) if len(configs) > 1 else 0
+        d_val = delta.get(key, "—")
+        print(f"  {metric_label:<18} {a_val:>15{fmt}}{suffix} {b_val:>15{fmt}}{suffix} {d_val:>14}")
+
+    # Pass rate row
+    a_pr = run_summary.get(configs[0], {}).get("pass_rate", {}).get("mean", 0) if configs else 0
+    b_pr = run_summary.get(configs[1], {}).get("pass_rate", {}).get("mean", 0) if len(configs) > 1 else 0
+    print(f"  {'Pass Rate':<18} {a_pr*100:>15.1f}% {b_pr*100:>15.1f}% {delta.get('pass_rate', '—'):>14}")
+
+    _print_row("Total Tokens", "tokens", ",")
+    _print_row("Input Tokens", "input_tokens", ",")
+    _print_row("Output Tokens", "output_tokens", ",")
+    _print_row("Cost (USD)", "cost_usd", ".4f", "")
+    _print_row("Time", "time_seconds", ".1f", "s")
+    _print_row("Turns", "num_turns", ".1f")
+    print(f"{'='*70}")
 
 
 if __name__ == "__main__":
