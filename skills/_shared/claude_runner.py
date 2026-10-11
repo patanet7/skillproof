@@ -28,10 +28,76 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+
+
+# Names copied from the parent environment into the `claude -p` child. Everything
+# else is dropped (replace, not merge), so a stray ANTHROPIC_API_KEY,
+# ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_SIMPLE or CLAUDE_CODE_USE_* in the parent can
+# never reach the child and override the subscription login. Only names are
+# listed here; values are copied at call time and never logged.
+CHILD_ENV_ALLOWLIST = (
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "TMPDIR",
+    "TERM",
+    "USER",
+    "LOGNAME",
+    "CLAUDE_CONFIG_DIR",
+)
+
+# Key sources that mean the child did not use the subscription login.
+FORBIDDEN_KEY_SOURCES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+
+
+class AuthSourceError(RuntimeError):
+    """The child reported an auth source other than the subscription login."""
+
+
+def child_env(parent: dict[str, str] | None = None) -> dict[str, str]:
+    """Build the child environment from the allowlist only."""
+    src = os.environ if parent is None else parent
+    return {k: src[k] for k in CHILD_ENV_ALLOWLIST if k in src}
+
+
+def check_auth_source(stdout: str) -> None:
+    """Refuse when the stream-json `system/init` event reports an API-key source.
+
+    This is a weak check: `apiKeySource` is compared with the forbidden key
+    sources. A stronger check would read the `account` fields of the SDK
+    `initialize` response.
+    """
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and event.get("type") == "system" and event.get("subtype") == "init":
+            source = event.get("apiKeySource")
+            if source in FORBIDDEN_KEY_SOURCES:
+                raise AuthSourceError(
+                    f"claude reported apiKeySource={source}; expected the subscription login"
+                )
+            return
+
+
+def _result_event(stdout: str) -> str:
+    """Return the final `result` event line of a stream-json run (or stdout unchanged)."""
+    last = None
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and event.get("type") == "result":
+            last = line
+    return last if last is not None else stdout
 
 
 @dataclass
@@ -98,7 +164,10 @@ def run_claude(
     cwd: Path | None = None,
     allowed_tools: list[str] | None = None,
 ) -> RunResult:
-    """Run a prompt through `claude -p --output-format json` and capture everything.
+    """Run a prompt through `claude -p --output-format stream-json` and capture everything.
+
+    The child gets an allowlisted environment only (see `child_env`), and the run
+    is refused when the `system/init` event reports an API-key `apiKeySource`.
 
     Args:
         prompt: The prompt to send.
@@ -111,7 +180,11 @@ def run_claude(
     Returns:
         RunResult with all metrics from the JSON response.
     """
-    cmd = ["claude", "-p", prompt, "--output-format", "json"]
+    env = child_env()
+    claude_bin = shutil.which("claude", path=env.get("PATH"))
+    if claude_bin is None:
+        raise FileNotFoundError("claude executable not found on PATH")
+    cmd = [claude_bin, "-p", prompt, "--output-format", "stream-json", "--verbose"]
 
     tools = allowed_tools or ["Read", "Glob", "Grep"]
     cmd.extend(["--allowedTools"] + tools)
@@ -120,9 +193,6 @@ def run_claude(
         cmd.extend(["--model", model])
     if skill_path:
         cmd.extend(["--skill-path", str(skill_path)])
-
-    # Prevent nested Claude session detection
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
     start = time.monotonic()
     try:
@@ -144,7 +214,8 @@ def run_claude(
             total_duration_seconds=float(timeout),
         )
 
-    return parse_claude_response(proc.stdout, proc.returncode, wall_duration)
+    check_auth_source(proc.stdout)
+    return parse_claude_response(_result_event(proc.stdout), proc.returncode, wall_duration)
 
 
 def parse_claude_response(
