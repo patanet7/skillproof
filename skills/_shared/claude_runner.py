@@ -30,17 +30,27 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 
+# Auth modes. `subscription` uses the Claude Code login (or CLAUDE_CODE_OAUTH_TOKEN /
+# CLAUDE_CONFIG_DIR) and drops API-key variables so a stray key cannot override it.
+# `api_key` passes ANTHROPIC_API_KEY through. Selected by the `auth_mode` argument or
+# the SKILLPROOF_AUTH_MODE environment variable; the default is `subscription`.
+AUTH_MODE_ENV = "SKILLPROOF_AUTH_MODE"
+SUBSCRIPTION = "subscription"
+API_KEY = "api_key"
+AUTH_MODES = (SUBSCRIPTION, API_KEY)
+
 # Names copied from the parent environment into the `claude -p` child. Everything
-# else is dropped (replace, not merge), so a stray ANTHROPIC_API_KEY,
-# ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_SIMPLE or CLAUDE_CODE_USE_* in the parent can
-# never reach the child and override the subscription login. Only names are
-# listed here; values are copied at call time and never logged.
-CHILD_ENV_ALLOWLIST = (
+# else is dropped (replace, not merge), so stray ANTHROPIC_AUTH_TOKEN,
+# CLAUDE_CODE_SIMPLE or CLAUDE_CODE_USE_* in the parent never reach the child. The
+# allowlist depends on the auth mode. Only names are listed here; values are copied
+# at call time and never logged.
+_BASE_ENV_ALLOWLIST = (
     "PATH",
     "HOME",
     "LANG",
@@ -49,30 +59,46 @@ CHILD_ENV_ALLOWLIST = (
     "TERM",
     "USER",
     "LOGNAME",
-    "CLAUDE_CONFIG_DIR",
 )
+CHILD_ENV_ALLOWLISTS = {
+    SUBSCRIPTION: _BASE_ENV_ALLOWLIST + ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN"),
+    API_KEY: _BASE_ENV_ALLOWLIST + ("ANTHROPIC_API_KEY",),
+}
 
-# Key sources that mean the child did not use the subscription login.
-FORBIDDEN_KEY_SOURCES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+# `apiKeySource` values that mean a key (not the login) authenticated the run.
+_KEY_SOURCES = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "apiKeyHelper", "/login managed key")
 
 
 class AuthSourceError(RuntimeError):
-    """The child reported an auth source other than the subscription login."""
+    """The child reported an auth source that does not match the requested mode."""
 
 
-def child_env(parent: dict[str, str] | None = None) -> dict[str, str]:
-    """Build the child environment from the allowlist only."""
+def resolve_auth_mode(auth_mode: str | None = None, parent: dict[str, str] | None = None) -> str:
+    """Return the requested auth mode: argument, else SKILLPROOF_AUTH_MODE, else subscription."""
     src = os.environ if parent is None else parent
-    return {k: src[k] for k in CHILD_ENV_ALLOWLIST if k in src}
+    mode = auth_mode or src.get(AUTH_MODE_ENV) or SUBSCRIPTION
+    if mode not in AUTH_MODES:
+        raise ValueError(f"unknown auth mode {mode!r}; expected one of {AUTH_MODES}")
+    return mode
 
 
-def check_auth_source(stdout: str) -> None:
-    """Refuse when the stream-json `system/init` event reports an API-key source.
+def child_env(parent: dict[str, str] | None = None, auth_mode: str | None = None) -> dict[str, str]:
+    """Build the child environment from the mode's allowlist only."""
+    src = os.environ if parent is None else parent
+    mode = resolve_auth_mode(auth_mode, src)
+    return {k: src[k] for k in CHILD_ENV_ALLOWLISTS[mode] if k in src}
 
-    This is a weak check: `apiKeySource` is compared with the forbidden key
-    sources. A stronger check would read the `account` fields of the SDK
-    `initialize` response.
+
+def check_auth_source(stdout: str, auth_mode: str = SUBSCRIPTION) -> None:
+    """Refuse when the reported auth source does not match the requested mode.
+
+    This is a mismatch check, not a proof of identity: it compares the
+    `apiKeySource` field of the stream-json `system/init` event with the mode
+    that was requested. In `subscription` mode a reported API-key source is a
+    mismatch; in `api_key` mode a missing or `none` source is a mismatch.
     """
+    if auth_mode not in AUTH_MODES:
+        raise ValueError(f"unknown auth mode {auth_mode!r}; expected one of {AUTH_MODES}")
     for line in stdout.splitlines():
         try:
             event = json.loads(line)
@@ -80,9 +106,14 @@ def check_auth_source(stdout: str) -> None:
             continue
         if isinstance(event, dict) and event.get("type") == "system" and event.get("subtype") == "init":
             source = event.get("apiKeySource")
-            if source in FORBIDDEN_KEY_SOURCES:
+            uses_key = source in _KEY_SOURCES
+            if auth_mode == SUBSCRIPTION and uses_key:
                 raise AuthSourceError(
-                    f"claude reported apiKeySource={source}; expected the subscription login"
+                    f"claude reported apiKeySource={source}; requested auth mode is subscription"
+                )
+            if auth_mode == API_KEY and not uses_key:
+                raise AuthSourceError(
+                    f"claude reported apiKeySource={source}; requested auth mode is api_key"
                 )
             return
 
@@ -163,15 +194,20 @@ def run_claude(
     model: str | None = None,
     cwd: Path | None = None,
     allowed_tools: list[str] | None = None,
+    auth_mode: str | None = None,
 ) -> RunResult:
     """Run a prompt through `claude -p --output-format stream-json` and capture everything.
 
     The child gets an allowlisted environment only (see `child_env`), and the run
-    is refused when the `system/init` event reports an API-key `apiKeySource`.
+    is refused when the `system/init` event reports an auth source that does not
+    match the requested mode (see `check_auth_source`).
 
     Args:
         prompt: The prompt to send.
-        skill_path: Path to skill directory (None for baseline).
+        skill_path: Path to skill directory containing SKILL.md (None for baseline).
+            It is loaded through a temporary plugin directory (`--plugin-dir`).
+        auth_mode: "subscription" (default) or "api_key"; falls back to
+            SKILLPROOF_AUTH_MODE.
         timeout: Timeout in seconds.
         model: Optional model override.
         cwd: Working directory for the subprocess.
@@ -180,7 +216,8 @@ def run_claude(
     Returns:
         RunResult with all metrics from the JSON response.
     """
-    env = child_env()
+    mode = resolve_auth_mode(auth_mode)
+    env = child_env(auth_mode=mode)
     claude_bin = shutil.which("claude", path=env.get("PATH"))
     if claude_bin is None:
         raise FileNotFoundError("claude executable not found on PATH")
@@ -191,31 +228,45 @@ def run_claude(
 
     if model:
         cmd.extend(["--model", model])
-    if skill_path:
-        cmd.extend(["--skill-path", str(skill_path)])
 
-    start = time.monotonic()
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=str(cwd) if cwd else None,
-            env=env,
-        )
-        wall_duration = time.monotonic() - start
-    except subprocess.TimeoutExpired:
-        return RunResult(
-            response=f"[TIMEOUT after {timeout}s]",
-            is_error=True,
-            exit_code=-1,
-            duration_ms=timeout * 1000,
-            total_duration_seconds=float(timeout),
-        )
+    with tempfile.TemporaryDirectory(prefix="skillproof-plugin-") as plugin_root:
+        if skill_path:
+            plugin_dir = _make_plugin_dir(Path(plugin_root), Path(skill_path))
+            cmd.extend(["--plugin-dir", str(plugin_dir)])
 
-    check_auth_source(proc.stdout)
+        start = time.monotonic()
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=str(cwd) if cwd else None,
+                env=env,
+            )
+            wall_duration = time.monotonic() - start
+        except subprocess.TimeoutExpired:
+            return RunResult(
+                response=f"[TIMEOUT after {timeout}s]",
+                is_error=True,
+                exit_code=-1,
+                duration_ms=timeout * 1000,
+                total_duration_seconds=float(timeout),
+            )
+
+    check_auth_source(proc.stdout, mode)
     return parse_claude_response(_result_event(proc.stdout), proc.returncode, wall_duration)
+
+
+def _make_plugin_dir(root: Path, skill_path: Path) -> Path:
+    """Create a minimal plugin at root/plugin holding the skill at skills/<name>/."""
+    plugin = root / "plugin"
+    (plugin / ".claude-plugin").mkdir(parents=True)
+    (plugin / ".claude-plugin" / "plugin.json").write_text(
+        json.dumps({"name": "skillproof-under-test", "version": "0.0.0"})
+    )
+    shutil.copytree(skill_path, plugin / "skills" / skill_path.resolve().name)
+    return plugin
 
 
 def parse_claude_response(
